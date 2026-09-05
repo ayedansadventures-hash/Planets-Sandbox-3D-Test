@@ -1,6 +1,6 @@
 import * as T from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {step,G} from './physics.mjs';
+import {step,G} from './physics.mjs?v=2';
 const $=id=>document.getElementById(id), AU=10, EARTH=332946;
 const renderer=new T.WebGLRenderer({canvas:$('universe'),antialias:true,alpha:false});
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.22;

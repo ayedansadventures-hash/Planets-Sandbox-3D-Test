@@ -18,3 +18,8 @@ footer{left:24px;right:auto;bottom:20px;transform:none;width:300px;max-height:ca
 /* Compact controls keep the scene open while preserving the grouped 2D workflow. */
 aside#inspector{width:330px!important;padding:20px 18px!important}
 footer{width:280px!important}
+/* Keep the flight-deck controls compact enough to leave the rendered system visible. */
+aside#inspector{width:292px!important;max-height:calc(100vh - 104px);padding:14px 14px!important;background:linear-gradient(145deg,#081522e8,#030914e8)}
+aside#inspector h2{font-size:24px;margin:6px 0 2px}aside#inspector .divider{margin:10px 0}aside#inspector details{padding:9px 0}aside#inspector label{margin-bottom:10px}aside#inspector input:not([type=checkbox]):not([type=range]),aside#inspector select{padding:8px;font-size:12px}aside#inspector .fields button{min-height:38px;padding:7px;font-size:10px}
+footer{width:246px!important;max-height:calc(100vh - 140px);background:linear-gradient(145deg,#081522e8,#030914e8)}footer .transport{gap:7px;padding:10px}footer .catalog{gap:5px;padding:9px}footer .catalog button{padding:7px 5px;font-size:8px}
+@media(max-width:900px){aside#inspector{left:10px;right:10px;width:auto!important;max-height:42vh}footer{left:10px;width:calc(100vw - 20px)!important;max-height:36vh}}

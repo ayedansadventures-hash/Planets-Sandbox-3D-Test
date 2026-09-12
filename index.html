@@ -17,6 +17,9 @@
 <body>
   <canvas id="universe" aria-label="3D universe. Left-drag to orbit, right-drag to pan, scroll to zoom."></canvas>
 
+  <!-- FLOATING RESTORE UI BUTTON (VISIBLE WHEN HUD IS HIDDEN) -->
+  <button id="showUIPill" class="floating-ui-pill" hidden title="Restore Interface (H)"><span>👁️</span> Show HUD</button>
+
   <!-- TOP FLIGHT COMMAND BAR -->
   <header class="command-bar">
     <div class="brand">
@@ -45,6 +48,7 @@
       <button id="newPlanetTop" class="btn btn-action"><span>＋</span> New Planet</button>
       <button id="toggleMoonsBtn" class="btn btn-toggle active" aria-pressed="true"><span>🌙</span> Moons: ON</button>
       <button id="audioToggleBtn" class="btn btn-icon" title="Toggle Cosmic Soundscape">🔊</button>
+      <button id="toggleUIBtn" class="btn btn-icon" title="Toggle UI / Clean Space View (H)">👁️</button>
     </div>
 
     <div class="telemetry-box">

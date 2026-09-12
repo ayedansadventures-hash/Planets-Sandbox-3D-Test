@@ -428,6 +428,130 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
   }
 
   // 6. ASTROBIOLOGY & LIFE LIKELIHOOD GUESSER
+  function getHabitableZone(star, spec = null) {
+    if (!star) return null;
+    const lum = star.isBlackHole ? 0.002 : clamp(Math.pow(star.mass, 3.5), 0.005, 50000);
+    const sqrtL = Math.sqrt(lum);
+    const gasType = spec?.gasType || "earthAir";
+    let ghFactor = 1.0;
+    if (gasType === "carbonDioxide") ghFactor = 2.4;
+    else if (gasType === "methane") ghFactor = 1.8;
+    else if (gasType === "ammonia") ghFactor = 1.9;
+    else if (gasType === "none") ghFactor = 0.65;
+    return {
+      innerAU: 0.95 * sqrtL * ghFactor,
+      outerAU: 1.45 * sqrtL * ghFactor,
+      lum
+    };
+  }
+
+  function updateHabitableZones3D() {
+    const showZones = $('showZones')?.checked || !$('creator')?.hidden;
+    if (!showZones || bodies.length === 0) {
+      climateZonesGroup.visible = false;
+      return;
+    }
+
+    // Determine host star
+    let host = null;
+    const targetSelect = $('customTarget');
+    if (targetSelect && targetSelect.value && targetSelect.value !== 'auto') {
+      host = bodies.find(b => String(b.id) === String(targetSelect.value));
+    }
+    if (!host && selected && (selected.type === 'star' || selected.isBlackHole)) {
+      host = selected;
+    }
+    if (!host) {
+      host = bodies.find(b => b.type === 'star') || bodies.find(b => b.isBlackHole) || bodies[0];
+    }
+    if (!host) {
+      climateZonesGroup.visible = false;
+      return;
+    }
+
+    climateZonesGroup.visible = true;
+    climateZonesGroup.position.set(host.p[0] * AU, host.p[1] * AU, host.p[2] * AU);
+
+    // Rebuild geometry if host changed or needs fresh rendering
+    if (climateZonesGroup.userData.hostId !== host.id) {
+      while (climateZonesGroup.children.length > 0) {
+        const c = climateZonesGroup.children.pop();
+        if (c.geometry) c.geometry.dispose();
+        if (c.material) c.material.dispose();
+      }
+
+      const hz = getHabitableZone(host);
+      const rocheDistAU = rocheLimit(host, 1 / EARTHS_PER_SUN, 0.000042);
+      const rRoche = Math.max(host.radius * 1.5, rocheDistAU * AU);
+      const rInner = Math.max(rRoche * 1.08, (hz ? hz.innerAU : 0.95) * AU);
+      const rOuter = Math.max(rInner * 1.15, (hz ? hz.outerAU : 1.45) * AU);
+      const rCold = rOuter * 2.1;
+
+      // 1. Tidal Shredding Void (Pitch Black)
+      const tidalMesh = new T.Mesh(
+        new T.RingGeometry(0.1, rRoche, 64),
+        new T.MeshBasicMaterial({ color: 0x000000, side: T.DoubleSide, transparent: false, depthWrite: false })
+      );
+      tidalMesh.rotation.x = Math.PI / 2;
+      climateZonesGroup.add(tidalMesh);
+
+      // Roche Warning Ring Border
+      const rocheLine = new T.LineLoop(
+        new T.BufferGeometry().setFromPoints(Array.from({ length: 64 }, (_, i) => {
+          const a = (i / 64) * Math.PI * 2;
+          return new T.Vector3(Math.cos(a) * rRoche, 0, Math.sin(a) * rRoche);
+        })),
+        new T.LineBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.85 })
+      );
+      climateZonesGroup.add(rocheLine);
+
+      // 2. Scorch Zone (Fiery Red)
+      const scorchMesh = new T.Mesh(
+        new T.RingGeometry(rRoche, rInner, 64),
+        new T.MeshBasicMaterial({ color: 0xef4444, side: T.DoubleSide, transparent: true, opacity: 0.28, blending: T.AdditiveBlending, depthWrite: false })
+      );
+      scorchMesh.rotation.x = Math.PI / 2;
+      climateZonesGroup.add(scorchMesh);
+
+      // 3. FULLY FILLED GREEN HABITABLE ZONE RING
+      const hzMesh = new T.Mesh(
+        new T.RingGeometry(rInner, rOuter, 64),
+        new T.MeshBasicMaterial({ color: 0x10b981, side: T.DoubleSide, transparent: true, opacity: 0.38, blending: T.AdditiveBlending, depthWrite: false })
+      );
+      hzMesh.rotation.x = Math.PI / 2;
+      climateZonesGroup.add(hzMesh);
+
+      // Habitable Zone Inner & Outer Guide Rings
+      const innerLine = new T.LineLoop(
+        new T.BufferGeometry().setFromPoints(Array.from({ length: 64 }, (_, i) => {
+          const a = (i / 64) * Math.PI * 2;
+          return new T.Vector3(Math.cos(a) * rInner, 0, Math.sin(a) * rInner);
+        })),
+        new T.LineBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.9 })
+      );
+      climateZonesGroup.add(innerLine);
+
+      const outerLine = new T.LineLoop(
+        new T.BufferGeometry().setFromPoints(Array.from({ length: 64 }, (_, i) => {
+          const a = (i / 64) * Math.PI * 2;
+          return new T.Vector3(Math.cos(a) * rOuter, 0, Math.sin(a) * rOuter);
+        })),
+        new T.LineBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.9 })
+      );
+      climateZonesGroup.add(outerLine);
+
+      // 4. Cold Zone Ring (Sapphire Blue Fading Outward)
+      const coldMesh = new T.Mesh(
+        new T.RingGeometry(rOuter, rCold, 64),
+        new T.MeshBasicMaterial({ color: 0x3b82f6, side: T.DoubleSide, transparent: true, opacity: 0.18, blending: T.AdditiveBlending, depthWrite: false })
+      );
+      coldMesh.rotation.x = Math.PI / 2;
+      climateZonesGroup.add(coldMesh);
+
+      climateZonesGroup.userData.hostId = host.id;
+    }
+  }
+
   function computeLifeLikelihood(primary, worldX, worldY, worldZ, spec) {
     if (!primary) {
       return { score: 0, zone: "Deep Space", tempC: -270, verdict: "Freezing vacuum of interstellar space. No stellar energy for metabolism." };
@@ -520,6 +644,7 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     const invA = 2 / r - v2 / mu;
     if (invA <= 1e-6) return null; // Escape trajectory
     const a = 1 / invA;
+    if (a <= 0 || a > 1000) return null;
 
     // Eccentricity vector e = (v x h)/mu - r/|r|
     const vxh_x = (vy * hz - vz * hy) / mu;
@@ -531,28 +656,37 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     const e = Math.hypot(ex, ey, ez);
     if (e >= 0.98) return null;
 
-    const b = a * Math.sqrt(Math.max(0, 1 - e * e));
+    const b = a * Math.sqrt(Math.max(0.01, 1 - e * e));
 
-    // Perifocal basis vectors
-    let px, py, pz;
-    if (e > 1e-5) {
-      px = ex / e; py = ey / e; pz = ez / e;
-    } else {
-      px = rx / r; py = ry / r; pz = rz / r;
-    }
+    // Orbital normal vector
     const wx = hx / h, wy = hy / h, wz = hz / h;
-    const qx = wy * pz - wz * py;
-    const qy = wz * px - wx * pz;
-    const qz = wx * py - wy * px;
+
+    let px, py, pz, qx, qy, qz;
+    if (e >= 0.04) {
+      px = ex / e; py = ey / e; pz = ez / e;
+      qx = wy * pz - wz * py;
+      qy = wz * px - wx * pz;
+      qz = wx * py - wy * px;
+    } else {
+      let rx0 = 1, ry0 = 0, rz0 = 0;
+      if (Math.abs(wx) > 0.9) { rx0 = 0; ry0 = 1; rz0 = 0; }
+      let ux = ry0 * wz - rz0 * wy, uy = rz0 * wx - rx0 * wz, uz = rx0 * wy - ry0 * wx;
+      const uLen = Math.hypot(ux, uy, uz);
+      px = ux / uLen; py = uy / uLen; pz = uz / uLen;
+      qx = wy * pz - wz * py;
+      qy = wz * px - wx * pz;
+      qz = wx * py - wy * px;
+    }
 
     const points = [];
-    for (let i = 0; i < segments; i++) {
+    for (let i = 0; i <= segments; i++) {
       const theta = (i / segments) * Math.PI * 2;
       const cosT = Math.cos(theta);
       const sinT = Math.sin(theta);
-      const xRel = a * (cosT - e) * px + b * sinT * qx;
-      const yRel = a * (cosT - e) * py + b * sinT * qy;
-      const zRel = a * (cosT - e) * pz + b * sinT * qz;
+      const shiftE = e >= 0.04 ? e : 0;
+      const xRel = a * (cosT - shiftE) * px + b * sinT * qx;
+      const yRel = a * (cosT - shiftE) * py + b * sinT * qy;
+      const zRel = a * (cosT - shiftE) * pz + b * sinT * qz;
       points.push(new T.Vector3(
         (parent.p[0] + xRel) * AU,
         (parent.p[1] + yRel) * AU,
@@ -592,8 +726,13 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
 
   // 8. ORBIT PLACEMENT PREVIEW & CLICK-TO-SPAWN
   function findDominantStar(targetId = null) {
-    if (targetId) {
-      const b = bodies.find(x => x.id === targetId);
+    if (targetId && targetId !== 'auto') {
+      const b = bodies.find(x => String(x.id) === String(targetId));
+      if (b) return b;
+    }
+    const targetSelect = $('customTarget');
+    if (targetSelect && targetSelect.value && targetSelect.value !== 'auto') {
+      const b = bodies.find(x => String(x.id) === String(targetSelect.value));
       if (b) return b;
     }
     if (selected) return selected;
@@ -877,24 +1016,78 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
 
     SoundEngine.playFlare();
     const verts = [], r = rng(Date.now() % 99991);
-    for (let i = 0; i < 220; i++) {
-      const v = new T.Vector3(r() * 2 - 1, r() * 2 - 1, r() * 2 - 1).normalize().multiplyScalar(0.8 + r() * 1.2);
+    for (let i = 0; i < 320; i++) {
+      const v = new T.Vector3(r() * 2 - 1, r() * 2 - 1, r() * 2 - 1).normalize().multiplyScalar(0.8 + r() * 1.5);
       verts.push(v.x, v.y, v.z);
     }
     const geo = new T.BufferGeometry();
     geo.setAttribute('position', new T.Float32BufferAttribute(verts, 3));
-    const cloud = new T.Points(geo, new T.PointsMaterial({ color: 0xffa33a, size: 0.12, transparent: true, opacity: 0.95, blending: T.AdditiveBlending, depthWrite: false }));
+    const cloud = new T.Points(geo, new T.PointsMaterial({ color: 0xff7700, size: 0.16, transparent: true, opacity: 0.95, blending: T.AdditiveBlending, depthWrite: false }));
     cloud.position.copy(star.mesh.position);
     scene.add(cloud);
-    effects.push({ mesh: cloud, age: 0, r: star.radius * 1.5 });
+    effects.push({ mesh: cloud, age: 0, r: star.radius * 2.2 });
 
-    // Auroras and heating on surrounding worlds
+    const toDestroy = [];
+    // Magnetic shielding deterioration, immediate scorching without shield, and mass evaporation
     for (const b of bodies) {
-      if (b === star) continue;
-      const d = Math.max(0.1, Math.hypot(b.p[0] - star.p[0], b.p[1] - star.p[1], b.p[2] - star.p[2]));
-      b.temp += Math.min(800, 120 / d);
-      if (b.magnetic <= 0 && b.atmo > 0) b.atmo = Math.max(0, b.atmo - 0.05 / d); // Atmospheric stripping
+      if (b === star || b.type === 'star' || b.isBlackHole) continue;
+      const d = Math.max(0.15, Math.hypot(b.p[0] - star.p[0], b.p[1] - star.p[1], b.p[2] - star.p[2]));
+
+      if (b.magnetic > 0.05) {
+        // Shielded world: magnetic field deteriorates gradually
+        const erosion = 0.35 / d;
+        b.magnetic = Math.max(0, b.magnetic - erosion);
+        b.temp += Math.min(250, 45 / d);
+        if (b.magnetic <= 0.05) {
+          b.magnetic = 0;
+          showToast(`⚠️ MAGNETOSPHERE STRIPPED: Solar flare eroded ${b.name}'s magnetic shield!`);
+        }
+      } else {
+        // Unshielded world: SCORCH IMMEDIATELY and EVAPORATE!
+        b.isLavaWorld = true;
+        b.scorchLevel = 1.0;
+        b.water = 0; // Oceans vaporized immediately
+        b.atmo = Math.max(0, (b.atmo || 1.0) - 0.35 / d);
+        b.temp = Math.max(b.temp || 288, 1450 + 350 / d);
+        b.color = '#ff3b00';
+        b.material.color.set('#ff3b00');
+        b.material.emissive.set('#ff2200');
+
+        // Sustained mass evaporation
+        if (b.initialMass === undefined) b.initialMass = b.mass;
+        if (b.initialRadius === undefined) b.initialRadius = b.radius;
+        const massLoss = Math.max(0.00003, b.mass * (0.32 / d));
+        b.mass = Math.max(0, b.mass - massLoss);
+
+        const massRatio = Math.max(0.001, b.mass / (b.initialMass || 1));
+        const sizeScale = Math.cbrt(massRatio);
+        b.radius = Math.max(0.05, b.initialRadius * sizeScale);
+        b.mesh.scale.set(b.radius, b.radius, b.radius);
+
+        // Complete Vaporization
+        if (b.mass <= 0.00015 / EARTHS_PER_SUN || b.radius <= 0.07) {
+          toDestroy.push(b);
+        }
+      }
     }
+
+    for (const b of toDestroy) {
+      const blast = new T.Mesh(
+        new T.SphereGeometry(1, 24, 18),
+        new T.MeshBasicMaterial({ color: 0xff5500, wireframe: true, transparent: true, opacity: 0.95, blending: T.AdditiveBlending })
+      );
+      blast.position.copy(b.mesh.position);
+      scene.add(blast);
+      effects.push({ mesh: blast, age: 0, r: b.radius * 4.0 });
+
+      SoundEngine.playImpact();
+      showToast(`💥 PLANET VAPORIZED: ${b.name} has completely evaporated under the extreme stellar flare!`);
+      destroyBody(b);
+      const idx = bodies.indexOf(b);
+      if (idx !== -1) bodies.splice(idx, 1);
+      if (selected === b) selectBody(null);
+    }
+
     showToast(`☀️ Solar Flare erupted from ${star.name} • Coronal Mass Ejection travelling outward`);
   }
 
@@ -1005,15 +1198,17 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     const sel = $('customTarget');
     if (!sel) return;
     const cur = sel.value;
-    sel.innerHTML = '';
-    for (const b of bodies) {
+    sel.innerHTML = '<option value="auto">Auto-Detect Dominant Star/Planet</option>';
+    for (const b of [...bodies].sort((x, y) => y.mass - x.mass)) {
       const opt = document.createElement('option');
       opt.value = b.id;
-      opt.textContent = `${b.name} (${b.type})`;
+      const typeLabel = b.type === 'star' ? '⭐ Star' : b.type === 'gas' ? '🪐 Gas Giant' : b.isMoon ? '🌙 Moon' : '🌍 Planet';
+      opt.textContent = `${b.name} (${typeLabel})`;
       sel.appendChild(opt);
     }
-    if (cur && bodies.some(b => String(b.id) === cur)) sel.value = cur;
-    else if (selected) sel.value = selected.id;
+    if (cur && (cur === 'auto' || bodies.some(b => String(b.id) === cur))) sel.value = cur;
+    else if (selected) sel.value = String(selected.id);
+    else sel.value = 'auto';
   }
 
   function showToast(msg) {
@@ -1027,10 +1222,36 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
 
   // 13. EVENT WIRING & INTERACTION
   function bindEvents() {
+    // UI Visibility Toggle (Clean Space Mode)
+    const toggleUI = () => {
+      const isHidden = document.body.classList.toggle('ui-hidden');
+      if ($('showUIPill')) $('showUIPill').hidden = !isHidden;
+      showToast(isHidden ? "Clean Space View • Press H or click 'Show HUD' to restore" : "HUD restored");
+    };
+
+    $('toggleUIBtn')?.addEventListener('click', toggleUI);
+    $('showUIPill')?.addEventListener('click', toggleUI);
+
+    window.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+      if (e.key === 'h' || e.key === 'H') {
+        toggleUI();
+      }
+    });
+
     // Top Bar
     $('loadPreset')?.addEventListener('click', () => loadPreset($('presetSelect').value));
     $('presetSelect')?.addEventListener('change', () => loadPreset($('presetSelect').value));
-    $('newPlanetTop')?.addEventListener('click', () => { $('creator').hidden = !$('creator').hidden; });
+    $('newPlanetTop')?.addEventListener('click', () => {
+      $('creator').hidden = !$('creator').hidden;
+      climateZonesGroup.userData.hostId = null;
+      updateHabitableZones3D();
+    });
+    $('closeCreator')?.addEventListener('click', () => {
+      $('creator').hidden = true;
+      climateZonesGroup.userData.hostId = null;
+      updateHabitableZones3D();
+    });
     $('toggleMoonsBtn')?.addEventListener('click', () => toggleMoons());
     $('audioToggleBtn')?.addEventListener('click', () => {
       const muted = SoundEngine.toggleMute();
@@ -1041,6 +1262,15 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     $('zoomOutBtn')?.addEventListener('click', () => { camera.position.multiplyScalar(1.25); });
     $('fitViewTopBtn')?.addEventListener('click', fitOverview);
     $('fitView')?.addEventListener('click', fitOverview);
+
+    $('customTarget')?.addEventListener('change', () => {
+      climateZonesGroup.userData.hostId = null;
+      updateHabitableZones3D();
+    });
+    $('showZones')?.addEventListener('change', () => {
+      climateZonesGroup.userData.hostId = null;
+      updateHabitableZones3D();
+    });
 
     // Bottom Dock
     $('playPause')?.addEventListener('click', () => {
@@ -1264,7 +1494,7 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
   }
 
   function spawnPlacedObject(worldPos) {
-    const parent = findDominantStar(Number($('customTarget')?.value));
+    const parent = findDominantStar($('customTarget')?.value);
     const pWorld = [worldPos.x / AU, worldPos.y / AU, worldPos.z / AU];
     const spawnType = document.querySelector('input[name="spawnType"]:checked')?.value || 'planet';
     const ecc = parseFloat($('eccentricity')?.value || '0') / 100;
@@ -1313,11 +1543,12 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     const deltaSec = Math.min((now - lastTime) / 1000, 0.05);
     lastTime = now;
 
+    let requestedDt = 0;
     if (playing && bodies.length > 0) {
       const warpMult = parseFloat($('timeScale')?.value || '49');
       // Warp range: 0.001 to 2.5 years per second
       const dtPerSec = Math.pow(warpMult / 100, 2.5) * 2.5 + 0.001;
-      const requestedDt = deltaSec * dtPerSec;
+      requestedDt = deltaSec * dtPerSec;
 
       // Adaptive substeps for symplectic stability
       const substeps = clamp(Math.ceil(requestedDt / 0.005), 1, 30);
@@ -1328,6 +1559,42 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
         resolveCollisions();
       }
       simYears += requestedDt;
+
+      // Dynamic Thermodynamic & Habitable Zone Biogenesis Loop
+      const dominantStar = bodies.find(b => b.type === 'star') || bodies[0];
+      if (dominantStar) {
+        const hz = getHabitableZone(dominantStar);
+        const lum = hz ? hz.lum : 1.0;
+        const thermalRate = Math.min(1.0, 0.65 * requestedDt * 365.25);
+
+        for (const b of bodies) {
+          if (b === dominantStar || b.type === 'star' || b.isBlackHole) continue;
+          const distAU = Math.max(0.01, Math.hypot(b.p[0] - dominantStar.p[0], b.p[1] - dominantStar.p[1], b.p[2] - dominantStar.p[2]));
+          const targetTemp = Math.round(278 * Math.pow(lum, 0.25) / Math.sqrt(distAU));
+          b.temp = (b.temp || 288) + (targetTemp - (b.temp || 288)) * thermalRate;
+
+          // Habitability & cooling
+          if (b.temp < 600) {
+            b.isLavaWorld = false;
+          }
+          if (hz && distAU >= hz.innerAU && distAU <= hz.outerAU) {
+            if (b.temp <= 320) {
+              b.water = Math.min(71, (b.water || 0) + 20 * thermalRate);
+              if (b.isLavaWorld || b.type === 'hotPlanet' || b.color === '#ff3b00') {
+                b.isLavaWorld = false;
+                b.type = 'rock';
+                b.color = '#38bdf8';
+                b.material.color.set('#38bdf8');
+                b.material.emissive.set('#000000');
+                if (!b.cooledNotified) {
+                  b.cooledNotified = true;
+                  showToast(`🌱 BIOGENESIS: ${b.name} cooled down in the Habitable Zone! Crust solidified and oceans formed!`);
+                }
+              }
+            }
+          }
+        }
+      }
     }
 
     // Visual Mesh Sync & Rotation
@@ -1341,8 +1608,10 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       if (b.ringMesh) b.ringMesh.position.copy(b.mesh.position);
     }
 
-    // Asteroid Belt Slow Rotation
-    asteroidBelt.rotation.y += deltaSec * 0.004;
+    // Asteroid Belt Rotation locked to simulation time (slows down or stops with sim!)
+    if (playing) {
+      asteroidBelt.rotation.y += requestedDt * 0.15;
+    }
 
     // Effects Lifecycle
     for (let i = effects.length - 1; i >= 0; i--) {
@@ -1371,6 +1640,7 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     }
 
     updateOrbitLines();
+    updateHabitableZones3D();
 
     // Telemetry Update
     $('simulationTime').textContent = simYears < 1 ? `${(simYears * 365.25).toFixed(1)} days` : `${simYears.toFixed(2)} yrs`;

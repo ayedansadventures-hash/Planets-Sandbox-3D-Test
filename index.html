@@ -1,16 +1,507 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Orbital • 3D Playground</title><link rel="stylesheet" href="style.css?v=11"><script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/controls/OrbitControls.js":"./vendor/OrbitControls.js"}}</script></head>
-<body><canvas id="universe" aria-label="3D universe. Drag to orbit, right-drag to pan, scroll to zoom."></canvas>
-<header><div class="brand"><span class="emblem">◎</span><div>ORBITAL<small>THREE-DIMENSIONAL PLAYGROUND</small></div></div><span class="badge">EXPERIMENT 03 / 3D</span><button id="reset">↻ Solar system</button><button id="fit">⛶ Overview</button></header>
-<section class="intro"><p>SOLAR SYSTEM · LIVE SIMULATION</p><span>Select a world. Double-click to explore up close.</span></section>
-<aside id="inspector"><p class="eyebrow">BODY OBSERVATORY</p><h2 id="title">Earth</h2><span id="kind" class="muted"></span><div class="divider"></div>
-<details open><summary>Core properties</summary><label>Name<input id="name" maxlength="32"></label><div class="fields"><label>Mass · Earths<input id="mass" type="number" min="0.000001" step="any"></label><label>Surface<input id="color" type="color"></label></div><label>Radius · visual scale <output id="radiusValue"></output><input id="radius" type="range" min="0.08" max="3" step="0.01"></label><p class="hint compact">Mass changes gravity and visible size. Radius can then be fine-tuned.</p><label>Axial tilt <output id="tiltValue"></output><input id="tilt" type="range" min="0" max="180" value="23"></label><label>Day length / spin <output id="dayValue"></output><input id="dayLength" type="range" min="2" max="120" step="1" value="24"></label><p class="hint compact">A 24 h day means one complete rotation every 24 planet-hours. Spin is accelerated visually so you can see it.</p><label>Gravity strength <output id="gravityValue"></output><input id="gravity" type="range" min="0" max="3" step="0.05" value="1"></label></details>
-<details><summary>Motion</summary><div class="fields triple"><label>Velocity X<input id="vx" type="number" step="0.01"></label><label>Velocity Y<input id="vy" type="number" step="0.01"></label><label>Velocity Z<input id="vz" type="number" step="0.01"></label></div></details>
-<details><summary>Surface & climate</summary><label>Surface water <output id="waterValue"></output><input id="water" type="range" min="0" max="100" step="1"></label><label>Ice caps <output id="iceValue"></output><input id="ice" type="range" min="0" max="100" step="1"></label><div class="fields"><label>Ocean<input id="ocean" type="color"></label><label>Land<input id="land" type="color"></label></div></details>
-<details><summary>Atmosphere & field</summary><label>Atmospheric pressure <output id="atmoValue"></output><input id="atmo" type="range" min="0" max="5" step="0.05"></label><label>Atmosphere tint<input id="atmoColor" type="color"></label><label>Magnetic field <output id="magneticValue"></output><input id="magnetic" type="range" min="0" max="10" step="0.1"></label></details>
-<div class="facts"><span>Temperature<strong id="temp"></strong></span><span>Speed<strong id="velocity"></strong></span><span>Impacts<strong id="impacts">0</strong></span></div><section class="body-card" aria-live="polite"><div class="body-orb" id="bodyOrb"></div><div><small>CLASSIFICATION</small><strong id="classification">Terrestrial planet</strong><span id="classificationSummary">Editable physical body</span></div></section><div class="body-facts"><span><small>COMPOSITION</small><b id="composition">Silicate rock</b></span><span><small>ATMOSPHERE</small><b id="atmosphereSummary">—</b></span><span><small>RADIUS</small><b id="radiusSummary">—</b></span><span><small>SURFACE GRAVITY</small><b id="gravitySummary">—</b></span></div><label>Impactor speed<select id="impactSpeed"><option value="0.65">Low</option><option value="1" selected>Medium</option><option value="1.65">High</option></select></label><div class="fields"><button id="focus" class="primary">Follow body</button><button id="impact">Launch impactor</button></div><div class="fields"><button id="rings">Toggle rings</button><button id="blackhole">Collapse</button></div><div class="fields"><button id="flare">Solar flare</button><button id="supernova">Supernova</button></div><button id="remove" class="subtle">Remove selected body</button><p class="hint">Impacts conserve momentum, combine materials, exchange water, and can strip atmosphere.</p></aside>
-<div id="message" role="status">Solar system ready • click any world to explore</div>
-<aside id="creator" hidden><p class="eyebrow">CUSTOM PLANET</p><h2>Planet studio</h2><p class="hint">Choose the visual style, pick the orbit target, then click anywhere in space to place it.</p><label>Planet name<input id="customName" maxlength="32" value="My planet"></label><label>World class<select id="customClass"><option value="rock">Rocky world</option><option value="gas">Gas giant</option><option value="moon">Moon</option><option value="molten">Molten planet</option><option value="redDwarf">Red dwarf</option><option value="brownDwarf">Brown dwarf</option><option value="failedStar">Failed star</option><option value="yellowStar">Yellow star</option><option value="blueGiant">Blue giant</option><option value="star">Star</option></select></label><label>Orbit / impact target<select id="customTarget"></select></label><div class="fields"><label>Surface<input id="customColor" type="color" value="#7aa9d6"></label><label>Ocean<input id="customOcean" type="color" value="#1f5b9d"></label></div><div class="fields"><label>Land<input id="customLand" type="color" value="#6d9a53"></label><label>Atmosphere<input id="customAtmo" type="color" value="#8ad8ff"></label></div><label>Water <output id="customWaterValue">55%</output><input id="customWater" type="range" min="0" max="100" value="55"></label><label>Mass · Earths<input id="customMass" type="number" min="0.01" value="1" step=".1"></label><label><input id="customRings" type="checkbox"> Add rings</label><button id="placeCustom" class="primary">Place custom planet</button></aside>
-<footer><div class="transport"><button id="pause" class="primary" aria-label="Pause">Ⅱ</button><div><b id="clock">0 days</b><small id="count"></small></div><label class="speed">TIME <select id="speed"><option value="0.002">Slow</option><option value="0.02" selected>Normal</option><option value="0.1">Fast</option><option value="0.5">Extreme</option></select></label><label><input id="trails" type="checkbox" checked> Trails</label><label><input id="moons" type="checkbox" checked> Moons</label><label><input id="axes" type="checkbox"> Axes</label><button id="moveMode">✥ Move</button><button id="save">Save</button><button id="load">Load</button></div><div class="catalog"><button id="clear">× Clear</button><button id="newPlanet" data-type="rock">＋ New Planet</button><button id="orbitTool">↗ Orbit</button><button id="impactTool">✦ Impact</button><button id="centuryTool">↻ Century</button><button id="zoneTool">◉ Zones</button><button data-type="rock"><i class="rock"></i>Rocky World</button><button data-type="gas"><i class="gas"></i>Gas Giant</button><button data-type="moon"><i class="moon"></i>Moon</button><button data-type="star"><i class="star"></i>Star</button><button data-type="blackhole"><i class="hole"></i>Black Hole</button><button id="customPlanet"><i class="custom"></i>Custom Planet</button><button id="moltenPlanet"><i class="molten"></i>Molten Planet</button><button id="regularPlanet"><i class="regular"></i>Regular Planet</button></div></footer>
-<div class="controls">DRAG · ORBIT &nbsp; RIGHT DRAG · PAN &nbsp; SCROLL · ZOOM<br><span>Move mode: drag a world · Create mode: click the glowing placement ring</span></div>
-<script type="module" src="app.js?v=14"></script></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Planets Sandbox 3D • Interactive Cosmic Gravity Simulator</title>
+  <link rel="stylesheet" href="style.css?v=20260912" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three.module.js",
+      "three/addons/controls/OrbitControls.js": "./vendor/OrbitControls.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="universe" aria-label="3D universe. Left-drag to orbit, right-drag to pan, scroll to zoom."></canvas>
+
+  <!-- TOP FLIGHT COMMAND BAR -->
+  <header class="command-bar">
+    <div class="brand">
+      <span class="emblem">🪐</span>
+      <div class="brand-text">
+        <strong>PLANETS SANDBOX <span class="badge-3d">3D</span></strong>
+        <small>PHYSICS & ASTROBIOLOGY LAB</small>
+      </div>
+    </div>
+
+    <div class="command-center">
+      <!-- PRESET SELECTOR -->
+      <div class="preset-box">
+        <label for="presetSelect" class="sr-only">Simulation Preset</label>
+        <select id="presetSelect" aria-label="Simulation preset">
+          <option value="solar">Solar System (8 Planets & Moons)</option>
+          <option value="earthMoon">Earth & Moon (Close Encounter)</option>
+          <option value="binary">Binary Stars (Aurelia & Cyanis)</option>
+          <option value="chaos">Five-Body Chaos (N-Body Dance)</option>
+          <option value="evolution">Evolution of the Solar System</option>
+          <option value="blackHole">Gargantua Black Hole & Accretion Disk</option>
+        </select>
+        <button id="loadPreset" class="btn btn-primary" title="Load Selected Preset">Load</button>
+      </div>
+
+      <button id="newPlanetTop" class="btn btn-action"><span>＋</span> New Planet</button>
+      <button id="toggleMoonsBtn" class="btn btn-toggle active" aria-pressed="true"><span>🌙</span> Moons: ON</button>
+      <button id="audioToggleBtn" class="btn btn-icon" title="Toggle Cosmic Soundscape">🔊</button>
+    </div>
+
+    <div class="telemetry-box">
+      <span id="runStatus" class="status-pill running">RUNNING</span>
+      <span class="telemetry-item"><small>TIME</small><strong id="simulationTime">0.00 yrs</strong></span>
+      <span class="telemetry-item"><small>BODIES</small><strong id="bodyCount">0</strong></span>
+      <span class="telemetry-item"><small>ZOOM</small><strong id="zoomValue">100%</strong></span>
+      <div class="zoom-cluster">
+        <button id="zoomInBtn" class="btn btn-mini" title="Zoom In">＋</button>
+        <button id="zoomOutBtn" class="btn btn-mini" title="Zoom Out">－</button>
+        <button id="fitViewTopBtn" class="btn btn-mini" title="Fit Entire Universe">⛶</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- EVOLUTION TIMELINE BAR (VISIBLE ONLY IN EVOLUTION PRESET) -->
+  <div id="evolutionTimeline" class="evolution-bar" hidden>
+    <div class="era-header">
+      <span class="badge-era">SOLAR SYSTEM EVOLUTION</span>
+      <strong id="eraTitle">1. 4.567 Ga: The Solar Nebula Collapse</strong>
+      <span id="eraTimeAgo" class="era-time">4.57 Billion Years Ago</span>
+    </div>
+    <p id="eraDescription" class="era-desc">A dense molecular cloud core collapses under gravity, forming the proto-Sun surrounded by an accretion disk.</p>
+    <div class="era-controls">
+      <button id="prevEraBtn" class="btn btn-mini">◀ Previous Era</button>
+      <button id="playEraBtn" class="btn btn-mini btn-action">▶ Auto-Play Evolution</button>
+      <button id="nextEraBtn" class="btn btn-mini">Next Era ▶</button>
+      <span id="eraStepIndicator" class="era-step">Era 1 of 8</span>
+    </div>
+  </div>
+
+  <!-- FLOATING BOTTOM AEROSPACE DOCK -->
+  <footer class="bottom-dock">
+    <div class="dock-cluster transport-cluster">
+      <button id="playPause" class="btn-play" aria-label="Pause simulation">Ⅱ</button>
+      <div class="warp-control">
+        <div class="warp-label">
+          <span>WARP SPEED</span>
+          <output id="timeScaleValue">10 days/s</output>
+        </div>
+        <input id="timeScale" type="range" min="0" max="100" value="49" />
+      </div>
+    </div>
+
+    <div class="dock-divider"></div>
+
+    <div class="dock-cluster filter-cluster">
+      <label class="dock-chip"><input id="showTrails" type="checkbox" checked /><span>Trails</span></label>
+      <label class="dock-chip"><input id="showLabels" type="checkbox" checked /><span>Labels</span></label>
+      <label class="dock-chip"><input id="showOrbits" type="checkbox" checked /><span>Orbits</span></label>
+      <label class="dock-chip"><input id="showGrid" type="checkbox" /><span>Grid</span></label>
+      <label class="dock-chip"><input id="showVelocity" type="checkbox" /><span>Vectors</span></label>
+      <label class="dock-chip"><input id="showAxes" type="checkbox" /><span>Axes</span></label>
+      <label class="dock-chip"><input id="showZones" type="checkbox" /><span>Habitable Zones</span></label>
+    </div>
+
+    <div class="dock-divider"></div>
+
+    <div class="dock-cluster action-cluster">
+      <button id="fitView" class="btn btn-dock" title="Fit Entire Universe">⛶ Fit</button>
+      <button id="moveBodyMode" class="btn btn-dock" title="Drag and Move Bodies Mode">✥ Move</button>
+      <button id="resetSimulation" class="btn btn-dock" title="Reset Current Preset">↺ Reset</button>
+      <button id="clearSimulation" class="btn btn-dock btn-danger" title="Clear All Bodies">× Clear</button>
+      <button id="saveUniverse" class="btn btn-dock" title="Save Universe Snapshot">💾 Save</button>
+      <button id="loadUniverse" class="btn btn-dock" title="Load Universe Snapshot">📂 Load</button>
+    </div>
+  </footer>
+
+  <!-- RIGHT CONTEXTUAL OBSERVATORY CONSOLE -->
+  <aside id="inspector" class="inspector-panel" hidden>
+    <div class="panel-header">
+      <p class="eyebrow">BODY OBSERVATORY</p>
+      <button id="closeInspector" class="btn-close" aria-label="Close Inspector">×</button>
+    </div>
+
+    <div class="body-hero-card">
+      <div class="planet-orb-container">
+        <div id="bodyOrb" class="body-orb"></div>
+      </div>
+      <div class="hero-details">
+        <h2 id="title">Earth</h2>
+        <span id="classification" class="classification-badge">Terrestrial Planet</span>
+        <p id="classificationSummary" class="hero-summary">Editable physical world</p>
+      </div>
+    </div>
+
+    <!-- TACTICAL ACTION BUTTONS -->
+    <div class="tactical-actions">
+      <button id="focus" class="btn btn-tactical btn-primary"><span>🎯</span> Follow</button>
+      <button id="impact" class="btn btn-tactical"><span>☄️</span> Impact</button>
+      <button id="rings" class="btn btn-tactical"><span>🪐</span> Rings</button>
+      <button id="flare" class="btn btn-tactical"><span>☀️</span> Solar Flare</button>
+      <button id="supernova" class="btn btn-tactical"><span>💥</span> Supernova</button>
+      <button id="blackhole" class="btn btn-tactical btn-warning"><span>🕳️</span> Collapse</button>
+    </div>
+
+    <!-- ASTROBIOLOGY SCIENCE CARD -->
+    <div class="science-card">
+      <div class="science-grid">
+        <div class="science-cell">
+          <small>HABITABILITY</small>
+          <strong id="bodyHabitability" class="text-life">98% (Habitable)</strong>
+        </div>
+        <div class="science-cell">
+          <small>SURFACE TEMP</small>
+          <strong id="temp">15 °C (288 K)</strong>
+        </div>
+        <div class="science-cell">
+          <small>ORBIT SPEED</small>
+          <strong id="velocity">29.8 km/s</strong>
+        </div>
+        <div class="science-cell">
+          <small>RADIUS</small>
+          <strong id="radiusSummary">6,371 km</strong>
+        </div>
+        <div class="science-cell">
+          <small>SURFACE GRAVITY</small>
+          <strong id="gravitySummary">1.00 g</strong>
+        </div>
+        <div class="science-cell">
+          <small>ESCAPE VELOCITY</small>
+          <strong id="escapeVelocity">11.2 km/s</strong>
+        </div>
+        <div class="science-cell full-width">
+          <small>ATMOSPHERE</small>
+          <strong id="atmosphereSummary">1.00 atm · N₂ / O₂</strong>
+        </div>
+        <div class="science-cell full-width">
+          <small>COMPOSITION</small>
+          <strong id="composition">Silicate rock, metallic iron core</strong>
+        </div>
+      </div>
+
+      <!-- MAGNETIC SHIELD METER -->
+      <div class="magnetic-field-box">
+        <div class="magnetic-header">
+          <small>MAGNETOSPHERE SHIELD</small>
+          <strong id="magneticValue">1.00× Earth</strong>
+        </div>
+        <div class="range-field">
+          <input id="magnetic" type="range" min="0" max="100" step="0.5" value="1" />
+        </div>
+        <div class="field-meter"><i id="bodyMagneticMeter" style="width: 1%;"></i></div>
+        <span class="hint compact">Shield deflects solar flare plasma and prevents radiation scorch.</span>
+      </div>
+    </div>
+
+    <!-- ACCORDION 1: CORE PROPERTIES -->
+    <details open class="inspector-accordion">
+      <summary>Core Physical Properties</summary>
+      <div class="accordion-content">
+        <label class="field-label">Name
+          <input id="name" maxlength="32" />
+        </label>
+        <div class="field-row">
+          <label class="field-label">Mass (Earths)
+            <input id="mass" type="number" min="0.000001" step="any" />
+          </label>
+          <label class="field-label">Surface Color
+            <input id="color" type="color" />
+          </label>
+        </div>
+        <label class="field-label">Visual Radius Scale <output id="radiusValue">1.00×</output>
+          <input id="radius" type="range" min="0.08" max="5" step="0.01" />
+        </label>
+        <label class="field-label">Axial Tilt <output id="tiltValue">23°</output>
+          <input id="tilt" type="range" min="0" max="180" value="23" />
+        </label>
+        <label class="field-label">Rotation / Day Length <output id="dayValue">24 h</output>
+          <input id="dayLength" type="range" min="1" max="120" step="1" value="24" />
+        </label>
+        <label class="field-label">Gravity Scale <output id="gravityValue">1.00×</output>
+          <input id="gravity" type="range" min="0" max="10" step="0.05" value="1" />
+        </label>
+      </div>
+    </details>
+
+    <!-- ACCORDION 2: MOTION & VELOCITY -->
+    <details class="inspector-accordion">
+      <summary>Motion & Orbital Velocity</summary>
+      <div class="accordion-content">
+        <div class="field-row triple">
+          <label class="field-label">Vx (AU/yr)<input id="vx" type="number" step="0.01" /></label>
+          <label class="field-label">Vy (AU/yr)<input id="vy" type="number" step="0.01" /></label>
+          <label class="field-label">Vz (AU/yr)<input id="vz" type="number" step="0.01" /></label>
+        </div>
+        <button id="recalculateOrbitBtn" class="btn btn-subtle" style="width:100%; margin-top: 8px;">Stabilize Circular Orbit Around Host</button>
+      </div>
+    </details>
+
+    <!-- ACCORDION 3: PLANET ENGINEERING (WATER, BANDS, ATMOSPHERE) -->
+    <details class="inspector-accordion">
+      <summary>Surface & Atmosphere Engineering</summary>
+      <div class="accordion-content">
+        <div class="tab-strip">
+          <button id="tabWaterBtn" class="btn-tab active">Water & Ice</button>
+          <button id="tabBandsBtn" class="btn-tab">Gas Bands</button>
+          <button id="tabAtmoBtn" class="btn-tab">Atmosphere</button>
+          <button id="tabRingsBtn" class="btn-tab">Rings</button>
+        </div>
+
+        <!-- WATER TAB -->
+        <div id="tabWaterContent" class="tab-pane">
+          <label class="field-label">Surface Water Coverage <output id="waterValue">71%</output>
+            <input id="water" type="range" min="0" max="100" step="1" />
+          </label>
+          <label class="field-label">Polar Ice Caps <output id="iceValue">15%</output>
+            <input id="ice" type="range" min="0" max="100" step="1" />
+          </label>
+          <div class="field-row">
+            <label class="field-label">Ocean Color<input id="ocean" type="color" value="#1d4ed8" /></label>
+            <label class="field-label">Land Color<input id="land" type="color" value="#15803d" /></label>
+          </div>
+        </div>
+
+        <!-- BANDS TAB -->
+        <div id="tabBandsContent" class="tab-pane" hidden>
+          <label class="field-label">Band Count <output id="bandCountVal">8</output>
+            <input id="bandCount" type="range" min="0" max="16" value="8" />
+          </label>
+          <label class="field-label">Band Turbulence <output id="bandTurbulenceVal">50%</output>
+            <input id="bandTurbulence" type="range" min="0" max="100" value="50" />
+          </label>
+          <label class="field-label">Band Palette
+            <select id="bandPaletteSelect">
+              <option value="jupiter">Jupiter Gold & Ochre</option>
+              <option value="purple">Purple Nebula (Exotic)</option>
+              <option value="cyan">Neon Cyan (Ice Giant)</option>
+              <option value="crimson">Crimson (Hot Jupiter)</option>
+              <option value="emerald">Emerald Methane</option>
+              <option value="custom">Custom Color Mix</option>
+            </select>
+          </label>
+          <div class="field-row triple">
+            <label class="field-label">Color 1<input id="bandColor1" type="color" value="#6b21a8" /></label>
+            <label class="field-label">Color 2<input id="bandColor2" type="color" value="#9333ea" /></label>
+            <label class="field-label">Color 3<input id="bandColor3" type="color" value="#c084fc" /></label>
+          </div>
+          <div class="field-row">
+            <label class="field-label">Great Storm Spot<input id="stormColor" type="color" value="#f43f5e" /></label>
+            <label class="field-label" style="display:flex; align-items:center; gap:8px; margin-top:22px;">
+              <input id="showGreatStorm" type="checkbox" checked /><span>Show Vortex Storm</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- ATMOSPHERE TAB -->
+        <div id="tabAtmoContent" class="tab-pane" hidden>
+          <label class="field-label">Atmosphere Type
+            <select id="gasTypeSelect">
+              <option value="earthAir">Nitrogen-Oxygen (Earth · 1.0× HZ)</option>
+              <option value="carbonDioxide">Dense CO₂ (Venus · 2.4× HZ Farther)</option>
+              <option value="methane">Methane (Titan · 1.8× HZ)</option>
+              <option value="hydrogenHelium">Hydrogen-Helium (Gas Giant · 1.2× HZ)</option>
+              <option value="ammonia">Ammonia (Exotic · 1.9× HZ)</option>
+              <option value="none">Airless Vacuum (Mercury · 0.65× Closer)</option>
+            </select>
+          </label>
+          <label class="field-label">Surface Pressure <output id="atmoValue">1.00 atm</output>
+            <input id="atmo" type="range" min="0" max="30" step="0.1" value="1.0" />
+          </label>
+          <label class="field-label">Atmosphere Glow Tint
+            <input id="atmoColor" type="color" value="#76bfff" />
+          </label>
+        </div>
+
+        <!-- RINGS TAB -->
+        <div id="tabRingsContent" class="tab-pane" hidden>
+          <label class="field-label" style="display:flex; align-items:center; gap:8px;">
+            <input id="bodyHasRing" type="checkbox" /><span>Enable Planetary Rings</span>
+          </label>
+          <label class="field-label">Ring Scale Extent <output id="bodyRingScaleVal">2.2× Planet</output>
+            <input id="bodyRingScale" type="range" min="1.1" max="4.0" step="0.1" value="2.2" />
+          </label>
+          <label class="field-label">Ring Tint Color
+            <input id="bodyRingColor" type="color" value="#d7bd7d" />
+          </label>
+        </div>
+      </div>
+    </details>
+
+    <div class="inspector-footer">
+      <button id="remove" class="btn btn-danger" style="width: 100%;"><span>🗑️</span> Remove Selected Body</button>
+    </div>
+  </aside>
+
+  <!-- NEW PLANET LAUNCHER STUDIO -->
+  <aside id="creator" class="launcher-panel" hidden>
+    <div class="panel-header">
+      <p class="eyebrow">NEW WORLD STUDIO</p>
+      <button id="closeCreator" class="btn-close" aria-label="Close Launcher">×</button>
+    </div>
+
+    <h2>Spawn New Object</h2>
+    <p class="hint">Choose object archetype, adjust orbital parameters, and click anywhere in space to place it!</p>
+
+    <!-- ARCHETYPE RADIO CARDS -->
+    <div class="archetype-grid">
+      <label class="archetype-card active">
+        <input type="radio" name="spawnType" value="planet" checked />
+        <span class="card-icon">🌍</span>
+        <strong>Rocky World</strong>
+      </label>
+      <label class="archetype-card">
+        <input type="radio" name="spawnType" value="hotPlanet" />
+        <span class="card-icon">🌋</span>
+        <strong>Molten Lava</strong>
+      </label>
+      <label class="archetype-card">
+        <input type="radio" name="spawnType" value="gasGiant" />
+        <span class="card-icon">🪐</span>
+        <strong>Gas Giant</strong>
+      </label>
+      <label class="archetype-card">
+        <input type="radio" name="spawnType" value="moon" />
+        <span class="card-icon">🌙</span>
+        <strong>Moon</strong>
+      </label>
+      <label class="archetype-card">
+        <input type="radio" name="spawnType" value="star" />
+        <span class="card-icon">☀️</span>
+        <strong>Star</strong>
+      </label>
+      <label class="archetype-card">
+        <input type="radio" name="spawnType" value="blackhole" />
+        <span class="card-icon">🕳️</span>
+        <strong>Black Hole</strong>
+      </label>
+      <label class="archetype-card">
+        <input type="radio" name="spawnType" value="customPlanet" />
+        <span class="card-icon">🧪</span>
+        <strong>Custom Studio</strong>
+      </label>
+    </div>
+
+    <!-- STAR TYPE CHOOSER (VISIBLE ONLY WHEN STAR SELECTED) -->
+    <div id="starTypeBox" class="star-type-selector" hidden>
+      <label class="field-label">Star Type
+        <select id="starType">
+          <option value="yellow">Yellow Star (Sun-like · 1.0 M☉)</option>
+          <option value="redDwarf">Red Dwarf (Proxima · 0.35 M☉)</option>
+          <option value="brownDwarf">Brown Dwarf (Substellar · 0.06 M☉)</option>
+          <option value="failed">Failed Star (Protostellar · 0.08 M☉)</option>
+          <option value="blueGiant">Blue Giant (Rigel · 12.0 M☉)</option>
+        </select>
+      </label>
+    </div>
+
+    <!-- ORBIT CONFIGURATION (ACTIVE BY DEFAULT) -->
+    <div class="orbit-config-box">
+      <div class="range-field">
+        <div class="range-header">
+          <span>Orbit Shape / Eccentricity</span>
+          <output id="eccentricityValue">0.00 (Circle)</output>
+        </div>
+        <input id="eccentricity" type="range" min="0" max="80" value="0" />
+      </div>
+
+      <label class="field-label">Orbit Direction
+        <select id="orbitDirection">
+          <option value="prograde">Prograde (Counter-Clockwise)</option>
+          <option value="retrograde">Retrograde (Clockwise)</option>
+        </select>
+      </label>
+
+      <label class="field-label">Host Star / Target
+        <select id="customTarget"></select>
+      </label>
+    </div>
+
+    <!-- CUSTOM PLANET PARAMETERS -->
+    <div id="customPlanetStudioFields" class="custom-studio-fields" hidden>
+      <label class="field-label">Planet Name
+        <input id="customName" maxlength="32" value="My Planet" />
+      </label>
+      <label class="field-label">Atmosphere Type
+        <select id="launchCustomGas">
+          <option value="earthAir">Nitrogen-Oxygen (Earth Air)</option>
+          <option value="carbonDioxide">Dense CO₂ (Venus-like · 2.4× HZ)</option>
+          <option value="methane">Methane (Titan-like · 1.8× HZ)</option>
+          <option value="hydrogenHelium">Hydrogen-Helium (Gas Giant)</option>
+          <option value="none">Airless Vacuum (Mercury)</option>
+          <option value="customMix">Custom Chemical Mix</option>
+        </select>
+      </label>
+
+      <!-- CUSTOM CHEMICAL GAS SLIDERS -->
+      <div id="customGasBreakdown" class="chemical-mix-box" hidden>
+        <div class="chemical-slider">
+          <div class="chem-header"><span>Nitrogen (N₂)</span><output id="customGasN2Val">78%</output></div>
+          <input id="customGasN2" type="range" min="0" max="100" value="78" />
+        </div>
+        <div class="chemical-slider">
+          <div class="chem-header"><span>Oxygen (O₂)</span><output id="customGasO2Val">21%</output></div>
+          <input id="customGasO2" type="range" min="0" max="100" value="21" />
+        </div>
+        <div class="chemical-slider">
+          <div class="chem-header"><span>Carbon Dioxide (CO₂)</span><output id="customGasCO2Val">1%</output></div>
+          <input id="customGasCO2" type="range" min="0" max="100" value="1" />
+        </div>
+        <div class="chemical-slider">
+          <div class="chem-header"><span>Methane (CH₄)</span><output id="customGasCH4Val">0%</output></div>
+          <input id="customGasCH4" type="range" min="0" max="100" value="0" />
+        </div>
+      </div>
+
+      <div class="field-row">
+        <label class="field-label">Pressure
+          <input id="launchCustomPressure" type="range" min="0.01" max="30" step="0.1" value="1.0" />
+        </label>
+        <label class="field-label">Water %
+          <input id="customWater" type="range" min="0" max="100" value="55" />
+        </label>
+      </div>
+
+      <div class="field-row">
+        <label class="field-label">Surface<input id="customColor" type="color" value="#7aa9d6" /></label>
+        <label class="field-label">Ocean<input id="customOcean" type="color" value="#1f5b9d" /></label>
+        <label class="field-label">Land<input id="customLand" type="color" value="#6d9a53" /></label>
+        <label class="field-label">Atmo Tint<input id="customAtmo" type="color" value="#8ad8ff" /></label>
+      </div>
+
+      <label class="field-label" style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
+        <input id="customRings" type="checkbox" /><span>Include Planetary Ring System</span>
+      </label>
+    </div>
+
+    <!-- 🧬 LIFE LIKELIHOOD GUESSER CARD -->
+    <div id="launcherLifeCard" class="life-guesser-card">
+      <div class="life-header">
+        <strong class="life-title">🧬 LIFE LIKELIHOOD GUESSER</strong>
+        <span id="launcherLifeScore" class="life-score">--%</span>
+      </div>
+      <div class="life-progress-bar">
+        <div id="launcherLifeBar" class="life-progress-fill" style="width: 0%;"></div>
+      </div>
+      <div class="life-meta-grid">
+        <div>
+          <small>ZONE</small>
+          <strong id="launcherLifeZone">--</strong>
+        </div>
+        <div>
+          <small>EST. TEMP</small>
+          <strong id="launcherLifeTemp">--</strong>
+        </div>
+      </div>
+      <p id="launcherLifeVerdict" class="life-verdict">Move mouse across space to analyze astrobiological potential.</p>
+    </div>
+
+    <button id="placeCustom" class="btn btn-action" style="width:100%; margin-top: 14px;">
+      ✦ Click Anywhere on Screen to Spawn!
+    </button>
+  </aside>
+
+  <!-- NOTIFICATION TOAST -->
+  <div id="message" role="status" class="toast-bubble">Simulation initialized • Explore the cosmos</div>
+
+  <script type="module" src="app.js?v=20260912"></script>
+</body>
+</html>

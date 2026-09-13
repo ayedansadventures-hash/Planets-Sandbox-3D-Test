@@ -31,16 +31,45 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
   controls.maxDistance = 2500;
   controls.target.set(0, 0, 0);
 
-  // Lighting
-  scene.add(new T.HemisphereLight(0xb8d7ff, 0x050a14, 0.45));
-  const sunlight = new T.PointLight(0xfff4df, 60, 0, 0.9);
+  // Lighting & Realism
+  const ambientLight = new T.AmbientLight(0x708099, 1.25);
+  scene.add(ambientLight);
+  const hemiLight = new T.HemisphereLight(0xffffff, 0x1e293b, 0.95);
+  scene.add(hemiLight);
+  const sunlight = new T.PointLight(0xfff7e6, 80, 0, 0.2);
   scene.add(sunlight);
 
-  // Groups
+  // Texture Loader & NASA Atlas Cache
+  const textureLoader = new T.TextureLoader();
+  const nasaTextures = {
+    sun: textureLoader.load('assets/sun.jpg'),
+    mercury: textureLoader.load('assets/mercury.jpg'),
+    venus: textureLoader.load('assets/venus.jpg'),
+    earth: textureLoader.load('assets/earth.jpg'),
+    mars: textureLoader.load('assets/mars.jpg'),
+    jupiter: textureLoader.load('assets/jupiter.jpg'),
+    saturn: textureLoader.load('assets/saturn.jpg'),
+    uranus: textureLoader.load('assets/uranus.jpg'),
+    neptune: textureLoader.load('assets/neptune.jpg'),
+  };
+  Object.values(nasaTextures).forEach(t => {
+    t.colorSpace = T.SRGBColorSpace;
+  });
+
+  // Groups & Helpers
   const asteroidBelt = new T.Group(); asteroidBelt.name = 'Asteroid Belt'; scene.add(asteroidBelt);
   const orbitGuidesGroup = new T.Group(); orbitGuidesGroup.name = 'Orbit Guides'; scene.add(orbitGuidesGroup);
   const climateZonesGroup = new T.Group(); climateZonesGroup.name = 'Climate Zones'; scene.add(climateZonesGroup);
   const effects = [];
+
+  const gridHelper = new T.GridHelper(200, 40, 0x334155, 0x1e293b);
+  gridHelper.position.y = -0.05;
+  gridHelper.visible = false;
+  scene.add(gridHelper);
+
+  const axesHelper = new T.AxesHelper(15);
+  axesHelper.visible = false;
+  scene.add(axesHelper);
 
   // Procedural Starfield
   const starGeo = new T.BufferGeometry(), starPos = [], starColors = [];
@@ -61,10 +90,12 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
 
   // Rings & Geometry
   const sphereGeo = new T.SphereGeometry(1, 64, 40);
-  const selectionRing = new T.Mesh(new T.RingGeometry(1.18, 1.25, 96), new T.MeshBasicMaterial({ color: 0x38bdf8, side: T.DoubleSide, transparent: true, opacity: 0.85 }));
+  const selectionRing = new T.Mesh(new T.RingGeometry(1.04, 1.14, 96), new T.MeshBasicMaterial({ color: 0x38bdf8, side: T.DoubleSide, transparent: true, opacity: 0.85, depthWrite: false }));
+  selectionRing.rotation.x = -Math.PI / 2;
+  selectionRing.visible = false;
   scene.add(selectionRing);
 
-  const placementRing = new T.Mesh(new T.RingGeometry(1.2, 1.28, 96), new T.MeshBasicMaterial({ color: 0x34d399, side: T.DoubleSide, transparent: true, opacity: 0.9, blending: T.AdditiveBlending }));
+  const placementRing = new T.Mesh(new T.RingGeometry(1.15, 1.25, 96), new T.MeshBasicMaterial({ color: 0x34d399, side: T.DoubleSide, transparent: true, opacity: 0.9, blending: T.AdditiveBlending, depthWrite: false }));
   placementRing.rotation.x = -Math.PI / 2; placementRing.visible = false; scene.add(placementRing);
 
   // 2. WEB AUDIO PROCEDURAL SOUND ENGINE
@@ -212,21 +243,50 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
         x.beginPath(); x.ellipse(280, 150, 42, 22, 0.1, 0, Math.PI * 2); x.fill();
       }
     } else {
-      // Terrestrial Rocky World with Water & Continents
+      // Terrestrial Rocky World with Organic Continents, Oceans & Atmospheric Clouds
       const water = spec.waterCoverage ?? spec.water ?? 65;
-      x.fillStyle = water > 0 ? (spec.oceanColor || '#1d4ed8') : (spec.color || '#8b8c86');
+      const oceanCol = spec.oceanColor || (water > 0 ? '#1e3a8a' : (spec.color || '#8b8c86'));
+      const landCol = spec.landColor || '#15803d';
+
+      x.fillStyle = oceanCol;
       x.fillRect(0, 0, 512, 256);
 
       const landShare = 1 - water / 100;
-      x.fillStyle = spec.landColor || '#15803d';
-      for (let i = 0; i < 140 * landShare; i++) {
-        const px = r() * 512, py = 25 + r() * 206, w = 10 + r() * 45, h = 5 + r() * 22;
-        x.beginPath(); x.ellipse(px, py, w, h, r() * 3, 0, Math.PI * 2); x.fill();
+      if (landShare > 0.02) {
+        // Broad Continents
+        x.fillStyle = landCol;
+        const numBlobs = Math.floor(180 * landShare);
+        for (let i = 0; i < numBlobs; i++) {
+          const px = r() * 512, py = 30 + r() * 196;
+          const rw = 12 + r() * 60 * landShare;
+          const rh = 8 + r() * 38 * landShare;
+          x.beginPath();
+          x.ellipse(px, py, rw, rh, r() * Math.PI, 0, Math.PI * 2);
+          x.fill();
+        }
+        // Highland & Mountain Ridges
+        x.fillStyle = '#92400e';
+        for (let i = 0; i < numBlobs * 0.35; i++) {
+          const px = r() * 512, py = 40 + r() * 176;
+          x.beginPath();
+          x.ellipse(px, py, 6 + r() * 20, 4 + r() * 12, r() * Math.PI, 0, Math.PI * 2);
+          x.fill();
+        }
       }
+
+      // Atmospheric Weather Clouds
+      x.fillStyle = 'rgba(255, 255, 255, 0.28)';
+      for (let i = 0; i < 30; i++) {
+        const cy = 20 + r() * 216;
+        x.beginPath();
+        x.ellipse(r() * 512, cy, 40 + r() * 120, 4 + r() * 14, 0.05, 0, Math.PI * 2);
+        x.fill();
+      }
+
       const ice = spec.iceCapCoverage ?? spec.ice ?? 12;
       if (ice > 0) {
         x.fillStyle = '#f8fafc';
-        const h = Math.max(3, ice * 0.5);
+        const h = Math.max(4, ice * 0.65);
         x.fillRect(0, 0, 512, h);
         x.fillRect(0, 256 - h, 512, h);
       }
@@ -280,21 +340,38 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       ...spec
     };
 
-    // Material
+    // Material & NASA Texture Integration
     const isStar = b.type === 'star';
     const isHole = b.isBlackHole;
-    b.textureMap = (isStar || isHole) ? null : generateProceduralTexture(b);
 
-    b.material = new T.MeshStandardMaterial({
-      map: b.textureMap,
-      color: (isStar || isHole) ? '#000000' : (b.textureMap ? '#ffffff' : b.color),
-      roughness: isStar ? 0.2 : 0.82,
-      metalness: 0
-    });
+    if (spec.textureKey && nasaTextures[spec.textureKey]) {
+      b.textureMap = nasaTextures[spec.textureKey];
+    } else if (isStar) {
+      b.textureMap = nasaTextures.sun;
+    } else if (isHole) {
+      b.textureMap = null;
+    } else {
+      b.textureMap = generateProceduralTexture(b);
+    }
 
     if (isStar) {
-      b.material.emissive = new T.Color(b.color);
-      b.material.emissiveIntensity = 2.8;
+      b.material = new T.MeshStandardMaterial({
+        map: nasaTextures.sun,
+        emissiveMap: nasaTextures.sun,
+        emissive: new T.Color(b.color || '#fff0cb'),
+        emissiveIntensity: 1.6,
+        roughness: 0.35,
+        metalness: 0.05
+      });
+    } else if (isHole) {
+      b.material = new T.MeshBasicMaterial({ color: 0x000000 });
+    } else {
+      b.material = new T.MeshStandardMaterial({
+        map: b.textureMap,
+        color: b.textureMap ? 0xffffff : new T.Color(b.color),
+        roughness: 0.72,
+        metalness: 0.05
+      });
     }
 
     b.mesh = new T.Mesh(sphereGeo, b.material);
@@ -303,55 +380,64 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     b.mesh.rotation.z = T.MathUtils.degToRad(b.tilt);
     scene.add(b.mesh);
 
-    // Atmosphere Mesh
+    // Atmospheric Scattering Rim Mesh (FrontSide for non-hollow globe)
     b.atmosphere = new T.Mesh(sphereGeo, new T.ShaderMaterial({
       transparent: true,
-      side: T.BackSide,
+      side: T.FrontSide,
+      blending: T.AdditiveBlending,
       depthWrite: false,
       uniforms: {
         tint: { value: new T.Color(b.atmoColor) },
-        strength: { value: Math.min(1.4, b.atmo * 0.35) }
+        strength: { value: Math.min(1.2, b.atmo * 0.35) }
       },
       vertexShader: `
-        varying vec3 n; varying vec3 v;
+        varying vec3 vNormal;
+        varying vec3 vViewPosition;
         void main() {
-          vec4 p = modelViewMatrix * vec4(position, 1.0);
-          n = normalize(normalMatrix * normal);
-          v = normalize(-p.xyz);
-          gl_Position = projectionMatrix * p;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          vNormal = normalize(normalMatrix * normal);
+          vViewPosition = -mvPosition.xyz;
+          gl_Position = projectionMatrix * mvPosition;
         }
       `,
       fragmentShader: `
-        uniform vec3 tint; uniform float strength;
-        varying vec3 n; varying vec3 v;
+        uniform vec3 tint;
+        uniform float strength;
+        varying vec3 vNormal;
+        varying vec3 vViewPosition;
         void main() {
-          float rim = pow(1.0 - abs(dot(normalize(n), normalize(v))), 2.8);
-          gl_FragColor = vec4(tint, rim * strength);
+          vec3 n = normalize(vNormal);
+          vec3 v = normalize(vViewPosition);
+          float rim = 1.0 - max(0.0, dot(n, v));
+          float glow = pow(rim, 3.2);
+          gl_FragColor = vec4(tint, glow * strength);
         }
       `
     }));
-    b.atmosphere.scale.setScalar(b.radius * 1.05);
+    b.atmosphere.scale.setScalar(b.radius * 1.025);
     b.atmosphere.visible = !isStar && !isHole && b.atmo > 0;
     scene.add(b.atmosphere);
 
-    // Magnetosphere Loops
+    // Magnetosphere Loops (Planets only, NOT Stars or Black Holes!)
     b.field = new T.Group();
-    for (let q = 0; q < 3; q++) {
-      const loop = new T.Mesh(
-        new T.TorusGeometry(1.3 + q * 0.25, 0.008, 8, 72),
-        new T.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.2 - q * 0.04, blending: T.AdditiveBlending, depthWrite: false })
-      );
-      loop.rotation.set(Math.PI / 2, q * 0.42, q * 0.63);
-      b.field.add(loop);
+    if (!isStar && !isHole) {
+      for (let q = 0; q < 3; q++) {
+        const loop = new T.Mesh(
+          new T.TorusGeometry(1.3 + q * 0.25, 0.008, 8, 72),
+          new T.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.2 - q * 0.04, blending: T.AdditiveBlending, depthWrite: false })
+        );
+        loop.rotation.set(Math.PI / 2, q * 0.42, q * 0.63);
+        b.field.add(loop);
+      }
+      b.field.scale.setScalar(b.radius * 1.2);
+      b.field.visible = b.magnetic > 0;
+      scene.add(b.field);
     }
-    b.field.scale.setScalar(b.radius * 1.2);
-    b.field.visible = b.magnetic > 0;
-    scene.add(b.field);
 
-    // Stellar Glow or Black Hole Rings
+    // Stellar Glow or Black Hole Rings (scaled down so Mercury at 0.39 AU is distinctly visible)
     if (isStar) {
       b.glow = new T.Sprite(new T.SpriteMaterial({ map: starGlowMap, color: b.color, blending: T.AdditiveBlending, transparent: true, depthWrite: false }));
-      b.glow.scale.setScalar(b.radius * 9.5);
+      b.glow.scale.setScalar(b.radius * 2.8);
       scene.add(b.glow);
     }
 
@@ -359,12 +445,12 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       createRingsMesh(b);
     }
 
-    // Orbit Guide LineLoop
+    // Orbit Guide LineLoop (visible by default for all orbiting bodies)
     b.orbitLine = new T.LineLoop(
       new T.BufferGeometry(),
-      new T.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.4, blending: T.AdditiveBlending, depthWrite: false })
+      new T.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.45, blending: T.AdditiveBlending, depthWrite: false })
     );
-    b.orbitLine.visible = false;
+    b.orbitLine.visible = !isStar && !isHole;
     orbitGuidesGroup.add(b.orbitLine);
 
     bodies.push(b);
@@ -768,18 +854,18 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     $('evolutionTimeline').hidden = (presetKey !== 'evolution');
 
     if (presetKey === 'solar') {
-      // Solar System with complete moon systems and realistic scaled visual clearance
-      const sun = createBody({ name: 'Sun', type: 'star', scienceType: 'star', mass: 1.0, radius: 1.6, color: '#fff0cb', temp: 5778, atmo: 0, magnetic: 1.0 });
+      // Solar System with complete moon systems and authentic NASA textures
+      const sun = createBody({ name: 'Sun', type: 'star', scienceType: 'star', mass: 1.0, radius: 1.6, color: '#fff0cb', textureKey: 'sun', temp: 5778, atmo: 0, magnetic: 0 });
 
       const planetsData = [
-        { name: 'Mercury', dist: 0.39, mass: 0.055, radius: 0.20, color: '#9e9389', type: 'rock', atmo: 0, temp: 440, inc: 0.12 },
-        { name: 'Venus', dist: 0.72, mass: 0.815, radius: 0.34, color: '#d7c6a5', type: 'rock', atmo: 92, atmoColor: '#fcd34d', gasType: 'carbonDioxide', temp: 737, inc: 0.05 },
-        { name: 'Earth', dist: 1.00, mass: 1.000, radius: 0.36, color: '#4f9cff', type: 'rock', atmo: 1.0, atmoColor: '#76bfff', gasType: 'earthAir', water: 71, ice: 15, temp: 288, inc: 0.02 },
-        { name: 'Mars', dist: 1.52, mass: 0.107, radius: 0.26, color: '#b87453', type: 'rock', atmo: 0.01, atmoColor: '#f87171', water: 2, ice: 20, temp: 210, inc: 0.03 },
-        { name: 'Jupiter', dist: 5.20, mass: 317.8, radius: 0.94, color: '#c8b399', type: 'gas', atmo: 3.0, bandCount: 12, bandColors: ['#d7ad7d', '#c89d6d', '#e2cbb0', '#9c7b58'], temp: 165, inc: 0.02 },
-        { name: 'Saturn', dist: 9.58, mass: 95.2, radius: 0.80, color: '#d3c39b', type: 'gas', atmo: 2.5, ring: true, ringScale: 2.4, ringColor: '#c7b997', temp: 134, inc: 0.04 },
-        { name: 'Uranus', dist: 19.20, mass: 14.5, radius: 0.60, color: '#98cbd0', type: 'gas', atmo: 2.0, ring: true, ringScale: 1.9, ringColor: '#93c5fd', tilt: 98, temp: 76, inc: 0.01 },
-        { name: 'Neptune', dist: 30.05, mass: 17.1, radius: 0.58, color: '#739cc4', type: 'gas', atmo: 2.0, ring: true, ringScale: 1.7, temp: 72, inc: 0.03 }
+        { name: 'Mercury', dist: 0.39, mass: 0.055, radius: 0.22, color: '#9e9389', type: 'rock', textureKey: 'mercury', atmo: 0, temp: 440, inc: 0.12 },
+        { name: 'Venus', dist: 0.72, mass: 0.815, radius: 0.34, color: '#d7c6a5', type: 'rock', textureKey: 'venus', atmo: 92, atmoColor: '#fcd34d', gasType: 'carbonDioxide', temp: 737, inc: 0.05 },
+        { name: 'Earth', dist: 1.00, mass: 1.000, radius: 0.36, color: '#4f9cff', type: 'rock', textureKey: 'earth', atmo: 1.0, atmoColor: '#76bfff', gasType: 'earthAir', water: 71, ice: 15, temp: 288, inc: 0.02 },
+        { name: 'Mars', dist: 1.52, mass: 0.107, radius: 0.26, color: '#b87453', type: 'rock', textureKey: 'mars', atmo: 0.01, atmoColor: '#f87171', water: 2, ice: 20, temp: 210, inc: 0.03 },
+        { name: 'Jupiter', dist: 5.20, mass: 317.8, radius: 0.94, color: '#c8b399', type: 'gas', textureKey: 'jupiter', atmo: 3.0, bandCount: 12, bandColors: ['#d7ad7d', '#c89d6d', '#e2cbb0', '#9c7b58'], temp: 165, inc: 0.02 },
+        { name: 'Saturn', dist: 9.58, mass: 95.2, radius: 0.80, color: '#d3c39b', type: 'gas', textureKey: 'saturn', atmo: 2.5, ring: true, ringScale: 2.4, ringColor: '#c7b997', temp: 134, inc: 0.04 },
+        { name: 'Uranus', dist: 19.20, mass: 14.5, radius: 0.60, color: '#98cbd0', type: 'gas', textureKey: 'uranus', atmo: 2.0, ring: true, ringScale: 1.9, ringColor: '#93c5fd', tilt: 98, temp: 76, inc: 0.01 },
+        { name: 'Neptune', dist: 30.05, mass: 17.1, radius: 0.58, color: '#739cc4', type: 'gas', textureKey: 'neptune', atmo: 2.0, ring: true, ringScale: 1.7, temp: 72, inc: 0.03 }
       ];
 
       const pMap = {};
@@ -790,6 +876,7 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
           radius: pd.radius,
           color: pd.color,
           type: pd.type,
+          textureKey: pd.textureKey,
           atmo: pd.atmo,
           atmoColor: pd.atmoColor,
           gasType: pd.gasType,
@@ -843,7 +930,7 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       showToast("Solar System preset loaded • 8 Planets & Major Moons");
 
     } else if (presetKey === 'earthMoon') {
-      const earth = createBody({ name: 'Earth', type: 'rock', mass: 1.0 / EARTHS_PER_SUN, radius: 1.2, color: '#4f9cff', atmo: 1.0, water: 71, ice: 15, temp: 288 });
+      const earth = createBody({ name: 'Earth', type: 'rock', textureKey: 'earth', mass: 1.0 / EARTHS_PER_SUN, radius: 1.2, color: '#4f9cff', atmo: 1.0, water: 71, ice: 15, temp: 288 });
       spawnOrbiter(earth, { name: 'Moon', type: 'moon', mass: 0.0123 / EARTHS_PER_SUN, radius: 0.32, color: '#c2c0b6', isMoon: true, gravityScale: 1.0 }, 0.42, 0.2);
       selectBody(earth);
       camera.position.set(3, 4, 8);
@@ -1133,6 +1220,8 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     inspector.hidden = false;
     selectionRing.visible = true;
     selectionRing.position.copy(b.mesh.position);
+    selectionRing.scale.setScalar(b.radius * 1.3);
+    selectionRing.material.color.set(b.type === 'star' ? 0xf59e0b : 0x38bdf8);
 
     $('title').textContent = b.name;
     $('classification').textContent = b.isBlackHole ? 'Black Hole' : b.type === 'star' ? 'Stellar Body' : b.type === 'gas' ? 'Gas Giant' : b.isMoon ? 'Natural Satellite' : 'Terrestrial Planet';
@@ -1172,7 +1261,11 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
 
     $('bodyHasRing').checked = Boolean(b.ring);
     $('bodyRingScale').value = b.ringScale || 2.2;
+    if ($('bodyRingScaleVal')) $('bodyRingScaleVal').textContent = `${parseFloat(b.ringScale || 2.2).toFixed(1)}× Planet`;
     $('bodyRingColor').value = b.ringColor || '#d7bd7d';
+    if ($('composition')) {
+      $('composition').textContent = b.isBlackHole ? 'Singularity & spacetime curvature' : b.type === 'star' ? 'Hydrogen & Helium plasma fusion' : b.type === 'gas' ? 'Hydrogen, Helium & metallic mantle' : 'Silicate crust, mantle & metallic core';
+    }
 
     // Diagnostics & Astrobiology
     const star = findDominantStar();
@@ -1289,6 +1382,56 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     $('resetSimulation')?.addEventListener('click', () => loadPreset(activePreset));
     $('clearSimulation')?.addEventListener('click', clearAllBodies);
 
+    // Snapshot Persistence (Save & Load Universe)
+    $('saveUniverse')?.addEventListener('click', () => {
+      try {
+        const snap = bodies.map(b => ({
+          name: b.name,
+          type: b.type,
+          scienceType: b.scienceType,
+          mass: b.mass,
+          radius: b.radius,
+          color: b.color,
+          p: b.p,
+          v: b.v,
+          tilt: b.tilt,
+          dayLength: b.dayLength,
+          atmo: b.atmo,
+          atmoColor: b.atmoColor,
+          gasType: b.gasType,
+          water: b.water,
+          ice: b.ice,
+          ring: b.ring,
+          ringScale: b.ringScale,
+          ringColor: b.ringColor,
+          isMoon: b.isMoon,
+          isBlackHole: b.isBlackHole,
+          textureKey: b.textureKey
+        }));
+        localStorage.setItem('ps3d_universe_save', JSON.stringify(snap));
+        showToast(`💾 Universe snapshot saved (${bodies.length} bodies)`);
+      } catch (e) {
+        showToast("Failed to save universe snapshot");
+      }
+    });
+
+    $('loadUniverse')?.addEventListener('click', () => {
+      try {
+        const raw = localStorage.getItem('ps3d_universe_save');
+        if (!raw) {
+          showToast("No saved universe snapshot found");
+          return;
+        }
+        const snap = JSON.parse(raw);
+        clearAllBodies();
+        snap.forEach(spec => createBody(spec));
+        fitOverview();
+        showToast(`📂 Universe snapshot restored (${snap.length} bodies)`);
+      } catch (e) {
+        showToast("Failed to restore universe snapshot");
+      }
+    });
+
     // Evolution Bar
     $('prevEraBtn')?.addEventListener('click', () => loadEvolutionStage(evolutionIndex - 1));
     $('nextEraBtn')?.addEventListener('click', () => loadEvolutionStage(evolutionIndex + 1));
@@ -1305,7 +1448,7 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       }
     });
 
-    // Inspector
+    // Inspector Close & Focus
     $('closeInspector')?.addEventListener('click', () => selectBody(null));
     $('focus')?.addEventListener('click', () => {
       if (!selected) return;
@@ -1316,6 +1459,7 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       showToast(`Camera locked to ${selected.name}`);
     });
 
+    // Tactical Cosmic Actions
     $('flare')?.addEventListener('click', triggerSolarFlare);
     $('supernova')?.addEventListener('click', triggerSupernova);
     $('blackhole')?.addEventListener('click', () => {
@@ -1364,6 +1508,57 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       }
     });
 
+    // Stabilize Orbit Button
+    $('recalculateOrbitBtn')?.addEventListener('click', () => {
+      if (!selected) {
+        showToast("Select a body first to stabilize its orbit");
+        return;
+      }
+      const parent = bodies.find(b => b.id === selected.parentId) || findDominantStar() || bodies[0];
+      if (!parent || parent === selected) {
+        showToast("No parent body found to orbit");
+        return;
+      }
+      const dx = selected.p[0] - parent.p[0], dy = selected.p[1] - parent.p[1], dz = selected.p[2] - parent.p[2];
+      const distAU = Math.max(0.01, Math.hypot(dx, dy, dz));
+      const speed = Math.sqrt(G * (parent.mass + selected.mass) / distAU);
+      const angle = Math.atan2(dz, dx);
+      selected.v[0] = parent.v[0] - Math.sin(angle) * speed;
+      selected.v[1] = parent.v[1];
+      selected.v[2] = parent.v[2] + Math.cos(angle) * speed;
+      selectBody(selected);
+      SoundEngine.playChime(660);
+      showToast(`Stabilized circular Keplerian orbit for ${selected.name} (${(speed * AU_YEAR_TO_KM_S).toFixed(1)} km/s)`);
+    });
+
+    // Display Toggles (Grid, Axes, Trails, Velocity, Labels)
+    $('showGrid')?.addEventListener('change', (e) => {
+      gridHelper.visible = e.target.checked;
+      showToast(gridHelper.visible ? "Orbital reference grid ON" : "Orbital grid OFF");
+    });
+    $('showAxes')?.addEventListener('change', (e) => {
+      axesHelper.visible = e.target.checked;
+      showToast(axesHelper.visible ? "Cartesian axes ON" : "Axes OFF");
+    });
+    $('showTrails')?.addEventListener('change', (e) => {
+      const show = e.target.checked;
+      bodies.forEach(b => {
+        if (b.orbitLine) b.orbitLine.visible = show;
+      });
+      showToast(show ? "Orbit lines & trails ON" : "Orbit lines OFF");
+    });
+    $('showLabels')?.addEventListener('change', (e) => {
+      showToast(e.target.checked ? "Planet telemetry labels ON" : "Planet labels OFF");
+    });
+    $('showVelocity')?.addEventListener('change', (e) => {
+      showToast(e.target.checked ? "Velocity vectors ON" : "Velocity vectors OFF");
+    });
+
+    $('timeScale')?.addEventListener('input', (e) => {
+      const days = parseFloat(e.target.value);
+      if ($('timeScaleValue')) $('timeScaleValue').textContent = `${days.toFixed(1)} d/s`;
+    });
+
     // Inspector Tabs
     ['Water', 'Bands', 'Atmo', 'Rings'].forEach(tab => {
       $(`tab${tab}Btn`)?.addEventListener('click', () => {
@@ -1372,6 +1567,69 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
           $(`tab${t}Content`).hidden = (t !== tab);
         });
       });
+    });
+
+    // Inspector Ring Scale
+    $('bodyRingScale')?.addEventListener('input', (e) => {
+      if (selected) {
+        selected.ringScale = parseFloat(e.target.value);
+        if ($('bodyRingScaleVal')) $('bodyRingScaleVal').textContent = `${selected.ringScale.toFixed(1)}× Planet`;
+        if (selected.ring) createRingsMesh(selected);
+      }
+    });
+
+    // Inspector Gas Bands Controls
+    $('bandCount')?.addEventListener('input', (e) => {
+      if ($('bandCountVal')) $('bandCountVal').textContent = e.target.value;
+      if (selected && selected.type === 'gas') {
+        selected.bandCount = parseInt(e.target.value);
+        refreshBodyTexture(selected);
+      }
+    });
+    $('bandTurbulence')?.addEventListener('input', (e) => {
+      if ($('bandTurbulenceVal')) $('bandTurbulenceVal').textContent = `${e.target.value}%`;
+      if (selected && selected.type === 'gas') {
+        selected.bandTurbulence = parseInt(e.target.value);
+        refreshBodyTexture(selected);
+      }
+    });
+    $('bandPaletteSelect')?.addEventListener('change', (e) => {
+      const palettes = {
+        jupiter: ['#d7ad7d', '#c89d6d', '#e2cbb0'],
+        saturn: ['#e2d5b8', '#d0bc90', '#bfa776'],
+        neptune: ['#38bdf8', '#0284c7', '#1e40af'],
+        crimson: ['#ef4444', '#991b1b', '#fca5a5'],
+        alien: ['#a855f7', '#06b6d4', '#10b981']
+      };
+      const pal = palettes[e.target.value] || palettes.jupiter;
+      if ($('bandColor1')) $('bandColor1').value = pal[0];
+      if ($('bandColor2')) $('bandColor2').value = pal[1];
+      if ($('bandColor3')) $('bandColor3').value = pal[2];
+      if (selected && selected.type === 'gas') {
+        selected.bandColors = pal;
+        refreshBodyTexture(selected);
+      }
+    });
+    ['bandColor1', 'bandColor2', 'bandColor3'].forEach((id, idx) => {
+      $(id)?.addEventListener('input', (e) => {
+        if (selected && selected.type === 'gas') {
+          if (!selected.bandColors) selected.bandColors = ['#d7ad7d', '#c89d6d', '#e2cbb0'];
+          selected.bandColors[idx] = e.target.value;
+          refreshBodyTexture(selected);
+        }
+      });
+    });
+    $('showGreatStorm')?.addEventListener('change', (e) => {
+      if (selected && selected.type === 'gas') {
+        selected.showGreatStorm = e.target.checked;
+        refreshBodyTexture(selected);
+      }
+    });
+    $('stormColor')?.addEventListener('input', (e) => {
+      if (selected && selected.type === 'gas') {
+        selected.stormColor = e.target.value;
+        refreshBodyTexture(selected);
+      }
     });
 
     // Inspector Inputs Live Binding
@@ -1405,7 +1663,12 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     });
 
     // New Planet Studio
-    $('closeCreator')?.addEventListener('click', () => { $('creator').hidden = true; });
+    $('closeCreator')?.addEventListener('click', () => {
+      $('creator').hidden = true;
+      climateZonesGroup.userData.hostId = null;
+      updateHabitableZones3D();
+    });
+
     document.querySelectorAll('input[name="spawnType"]').forEach(radio => {
       radio.addEventListener('change', (e) => {
         document.querySelectorAll('.archetype-card').forEach(c => c.classList.toggle('active', c.contains(e.target)));
@@ -1414,9 +1677,35 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       });
     });
 
+    $('launchCustomGas')?.addEventListener('change', (e) => {
+      if ($('customGasBreakdown')) $('customGasBreakdown').hidden = (e.target.value !== 'customMix');
+    });
+
+    ['N2', 'O2', 'CO2', 'CH4'].forEach(gas => {
+      $(`customGas${gas}`)?.addEventListener('input', (e) => {
+        if ($(`customGas${gas}Val`)) $(`customGas${gas}Val`).textContent = `${e.target.value}%`;
+      });
+    });
+
     $('eccentricity')?.addEventListener('input', (e) => {
       const val = parseFloat(e.target.value) / 100;
       $('eccentricityValue').textContent = val === 0 ? "0.00 (Circle)" : `${val.toFixed(2)} (Elliptical)`;
+    });
+
+    // Spawn Planet Button in New Planet Studio
+    $('placeCustom')?.addEventListener('click', () => {
+      const parent = findDominantStar($('customTarget')?.value);
+      const angle = Math.random() * Math.PI * 2;
+      const dist = (parent ? Math.max(2.5, parent.radius * 2.8) : 8.0) + Math.random() * 3.5;
+      const hit = placementRing.visible ? placementRing.position : new T.Vector3(
+        (parent ? parent.mesh.position.x : 0) + Math.cos(angle) * dist,
+        0,
+        (parent ? parent.mesh.position.z : 0) + Math.sin(angle) * dist
+      );
+      spawnPlacedObject(hit);
+      $('creator').hidden = true;
+      climateZonesGroup.userData.hostId = null;
+      updateHabitableZones3D();
     });
 
     // Raycasting & Click Placement
@@ -1512,17 +1801,53 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     const vx = (parent?.v[0] || 0) - Math.sin(angle) * speed;
     const vz = (parent?.v[2] || 0) + Math.cos(angle) * speed;
 
-    const b = createBody({
+    let bodySpec = {
       name: spawnType === 'customPlanet' ? ($('customName')?.value || 'Custom World') : `Placed ${spawnType}`,
-      type: spawnType,
-      mass: (spawnType === 'star' ? 1.0 : spawnType === 'gasGiant' ? 100 : 1.0) / EARTHS_PER_SUN,
-      radius: spawnType === 'star' ? 1.4 : spawnType === 'gasGiant' ? 0.85 : 0.38,
-      color: spawnType === 'hotPlanet' ? '#ef4444' : '#38bdf8',
+      type: spawnType === 'customPlanet' ? 'rock' : spawnType,
+      mass: 1.0 / EARTHS_PER_SUN,
+      radius: 0.38,
+      color: '#38bdf8',
       p: pWorld,
       v: [vx, 0, vz],
       parentId: parent?.id || null,
-      ring: $('customRings')?.checked || false
-    });
+      ring: false
+    };
+
+    if (spawnType === 'customPlanet') {
+      bodySpec.color = $('customColor')?.value || '#38bdf8';
+      bodySpec.oceanColor = $('customOcean')?.value || '#1d4ed8';
+      bodySpec.landColor = $('customLand')?.value || '#15803d';
+      bodySpec.atmoColor = $('customAtmo')?.value || '#8ad8ff';
+      bodySpec.atmo = parseFloat($('launchCustomPressure')?.value || '1.0');
+      bodySpec.water = parseFloat($('customWater')?.value || '55');
+      bodySpec.gasType = $('launchCustomGas')?.value || 'earthAir';
+      bodySpec.ring = Boolean($('customRings')?.checked);
+    } else if (spawnType === 'gasGiant') {
+      bodySpec.mass = 120 / EARTHS_PER_SUN;
+      bodySpec.radius = 0.88;
+      bodySpec.color = '#d7ad7d';
+      bodySpec.bandCount = parseInt($('bandCount')?.value || '10');
+      bodySpec.bandColors = [$('bandColor1')?.value || '#d7ad7d', $('bandColor2')?.value || '#c89d6d', $('bandColor3')?.value || '#e2cbb0'];
+      bodySpec.showGreatStorm = $('showGreatStorm')?.checked !== false;
+      bodySpec.stormColor = $('stormColor')?.value || '#f43f5e';
+      bodySpec.ring = Boolean($('customRings')?.checked);
+    } else if (spawnType === 'star') {
+      const sType = $('starType')?.value || 'yellowDwarf';
+      bodySpec.mass = 1.0;
+      bodySpec.radius = 1.4;
+      bodySpec.color = '#fff0cb';
+      bodySpec.temp = 5778;
+      if (sType === 'redGiant') { bodySpec.radius = 2.6; bodySpec.color = '#f97316'; bodySpec.temp = 3600; bodySpec.mass = 1.8; }
+      else if (sType === 'blueSupergiant') { bodySpec.radius = 2.2; bodySpec.color = '#60a5fa'; bodySpec.temp = 18000; bodySpec.mass = 8.0; }
+      else if (sType === 'whiteDwarf') { bodySpec.radius = 0.5; bodySpec.color = '#e0f2fe'; bodySpec.temp = 25000; bodySpec.mass = 0.8; }
+      else if (sType === 'neutronStar') { bodySpec.radius = 0.25; bodySpec.color = '#a855f7'; bodySpec.temp = 100000; bodySpec.mass = 1.4; }
+    } else if (spawnType === 'hotPlanet') {
+      bodySpec.color = '#ef4444';
+      bodySpec.temp = 1550;
+      bodySpec.isLavaWorld = true;
+    }
+
+    const b = createBody(bodySpec);
 
     SoundEngine.playChime(780);
     selectBody(b);
@@ -1598,6 +1923,11 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     }
 
     // Visual Mesh Sync & Rotation
+    const dominantStar = bodies.find(b => b.type === 'star');
+    if (dominantStar) {
+      sunlight.position.set(dominantStar.p[0] * AU, dominantStar.p[1] * AU, dominantStar.p[2] * AU);
+    }
+
     for (const b of bodies) {
       b.mesh.position.set(b.p[0] * AU, b.p[1] * AU, b.p[2] * AU);
       if (playing) b.mesh.rotation.y += deltaSec * (24 / Math.max(1, b.dayLength)) * 0.1;
@@ -1636,7 +1966,8 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     if (selected) {
       selectionRing.position.copy(selected.mesh.position);
       selectionRing.quaternion.copy(camera.quaternion);
-      selectionRing.scale.setScalar(selected.radius * 1.15);
+      selectionRing.scale.setScalar(selected.radius * 1.3);
+      selectionRing.material.color.set(selected.type === 'star' ? 0xf59e0b : 0x38bdf8);
     }
 
     updateOrbitLines();

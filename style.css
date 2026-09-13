@@ -20,6 +20,7 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
 body { background: var(--bg-space); color: var(--text-primary); overflow: hidden; width: 100vw; height: 100vh; }
 canvas#universe { display: block; width: 100vw; height: 100vh; touch-action: none; }
 
@@ -243,11 +244,11 @@ button, select, input { font: inherit; color: inherit; }
 /* RIGHT CONTEXTUAL OBSERVATORY CONSOLE */
 .inspector-panel {
   position: absolute;
-  right: 16px;
-  top: 60px;
-  bottom: 60px;
-  width: 310px;
-  border-radius: 14px;
+  right: 14px;
+  top: 52px;
+  max-height: calc(100vh - 105px);
+  width: 276px;
+  border-radius: 12px;
   border: 1px solid var(--glass-border);
   background: var(--glass-bg);
   backdrop-filter: blur(24px);
@@ -256,13 +257,32 @@ button, select, input { font: inherit; color: inherit; }
   z-index: 10;
   display: flex;
   flex-direction: column;
-  padding: 12px;
+  padding: 10px;
   overflow-y: auto;
 }
-.panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.eyebrow { font-size: 8.5px; font-weight: 800; letter-spacing: 1.5px; color: var(--cyan-neon); }
-.btn-close { background: none; border: none; font-size: 18px; color: var(--text-muted); cursor: pointer; padding: 1px 4px; }
-.btn-close:hover { color: #fff; }
+.panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.eyebrow { font-size: 8px; font-weight: 800; letter-spacing: 1.2px; color: var(--cyan-neon); }
+.btn-close {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  font-size: 16px;
+  line-height: 1;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.btn-close:hover {
+  background: rgba(239, 68, 68, 0.35);
+  border-color: #ef4444;
+  color: #fff;
+  transform: scale(1.08);
+}
 
 .body-hero-card {
   display: flex;
@@ -347,11 +367,11 @@ button, select, input { font: inherit; color: inherit; }
 /* NEW PLANET LAUNCHER STUDIO */
 .launcher-panel {
   position: absolute;
-  left: 16px;
-  top: 60px;
-  bottom: 60px;
-  width: 310px;
-  border-radius: 14px;
+  left: 14px;
+  top: 52px;
+  max-height: calc(100vh - 105px);
+  width: 276px;
+  border-radius: 12px;
   border: 1px solid var(--glass-border);
   background: var(--glass-bg);
   backdrop-filter: blur(24px);
@@ -360,7 +380,7 @@ button, select, input { font: inherit; color: inherit; }
   z-index: 10;
   display: flex;
   flex-direction: column;
-  padding: 12px;
+  padding: 10px;
   overflow-y: auto;
 }
 .launcher-panel h2 { font-family: 'Space Grotesk', sans-serif; font-size: 15px; color: #fff; margin-bottom: 2px; }

@@ -825,11 +825,11 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
 
     // Semi-major axis
     const invA = 2 / r - v2 / mu;
-    let a;
+    let rawA;
     if (invA <= 1e-6) {
-      a = Math.min(300, Math.max(0.1, r * 1.5)); // Bounded osculating trajectory for close encounters
+      rawA = Math.min(300, Math.max(0.1, r * 1.5));
     } else {
-      a = Math.min(600, Math.max(0.01, 1 / invA));
+      rawA = Math.min(600, Math.max(0.01, 1 / invA));
     }
 
     // Eccentricity vector e = (v x h)/mu - r/|r|
@@ -839,45 +839,62 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     const ex = vxh_x - rx / r;
     const ey = vxh_y - ry / r;
     const ez = vxh_z - rz / r;
-    const rawE = Math.hypot(ex, ey, ez);
-    const e = Math.min(0.96, isNaN(rawE) ? 0 : rawE);
-
-    const b = a * Math.sqrt(Math.max(0.01, 1 - e * e));
+    const rawE = Math.min(0.96, Math.hypot(ex, ey, ez) || 0);
 
     // Orbital normal vector
     const wx = hx / h, wy = hy / h, wz = hz / h;
 
+    // In-plane basis vectors
     let px, py, pz, qx, qy, qz;
-    if (e >= 0.04) {
-      px = ex / (e || 1); py = ey / (e || 1); pz = ez / (e || 1);
+    if (rawE > 1e-3) {
+      px = ex / rawE; py = ey / rawE; pz = ez / rawE;
       qx = wy * pz - wz * py;
       qy = wz * px - wx * pz;
       qz = wx * py - wy * px;
     } else {
-      let rx0 = 1, ry0 = 0, rz0 = 0;
-      if (Math.abs(wx) > 0.9) { rx0 = 0; ry0 = 1; rz0 = 0; }
-      let ux = ry0 * wz - rz0 * wy, uy = rz0 * wx - rx0 * wz, uz = rx0 * wy - ry0 * wx;
-      const uLen = Math.hypot(ux, uy, uz) || 1;
-      px = ux / uLen; py = uy / uLen; pz = uz / uLen;
+      px = rx / r; py = ry / r; pz = rz / r;
       qx = wy * pz - wz * py;
       qy = wz * px - wx * pz;
       qz = wx * py - wy * px;
     }
+
+    // Temporal smoothing to eliminate micro-jitter from N-body perturbations
+    if (!body.displayOrbit) {
+      body.displayOrbit = { a: rawA, e: rawE, px, py, pz, qx, qy, qz };
+    } else {
+      const rate = 0.12;
+      body.displayOrbit.a += (rawA - body.displayOrbit.a) * rate;
+      body.displayOrbit.e += (rawE - body.displayOrbit.e) * rate;
+      body.displayOrbit.px += (px - body.displayOrbit.px) * rate;
+      body.displayOrbit.py += (py - body.displayOrbit.py) * rate;
+      body.displayOrbit.pz += (pz - body.displayOrbit.pz) * rate;
+      const pLen = Math.hypot(body.displayOrbit.px, body.displayOrbit.py, body.displayOrbit.pz) || 1;
+      body.displayOrbit.px /= pLen;
+      body.displayOrbit.py /= pLen;
+      body.displayOrbit.pz /= pLen;
+      body.displayOrbit.qx += (qx - body.displayOrbit.qx) * rate;
+      body.displayOrbit.qy += (qy - body.displayOrbit.qy) * rate;
+      body.displayOrbit.qz += (qz - body.displayOrbit.qz) * rate;
+      const qLen = Math.hypot(body.displayOrbit.qx, body.displayOrbit.qy, body.displayOrbit.qz) || 1;
+      body.displayOrbit.qx /= qLen;
+      body.displayOrbit.qy /= qLen;
+      body.displayOrbit.qz /= qLen;
+    }
+
+    const d = body.displayOrbit;
+    const a = d.a;
+    const e = clamp(d.e, 0, 0.96);
+    const b = a * Math.sqrt(Math.max(0.01, 1 - e * e));
 
     const points = [];
     for (let i = 0; i <= segments; i++) {
       const theta = (i / segments) * Math.PI * 2;
       const cosT = Math.cos(theta);
       const sinT = Math.sin(theta);
-      const shiftE = e >= 0.04 ? e : 0;
-      const xRel = a * (cosT - shiftE) * px + b * sinT * qx;
-      const yRel = a * (cosT - shiftE) * py + b * sinT * qy;
-      const zRel = a * (cosT - shiftE) * pz + b * sinT * qz;
-      points.push(new T.Vector3(
-        (parent.p[0] + xRel) * AU,
-        (parent.p[1] + yRel) * AU,
-        (parent.p[2] + zRel) * AU
-      ));
+      const xRel = (a * (cosT - e)) * d.px + (b * sinT) * d.qx;
+      const yRel = (a * (cosT - e)) * d.py + (b * sinT) * d.qy;
+      const zRel = (a * (cosT - e)) * d.pz + (b * sinT) * d.qz;
+      points.push(new T.Vector3(xRel * AU, yRel * AU, zRel * AU));
     }
     return points;
   }
@@ -896,6 +913,8 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
         continue;
       }
 
+      body.orbitLine.position.copy(parent.mesh.position);
+
       const points = computeKeplerPoints(body, parent);
       if (!points || points.length === 0) {
         body.orbitLine.visible = false;
@@ -904,8 +923,8 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
 
       body.orbitLine.geometry.setFromPoints(points);
       const isHighlighted = body === selected || parent === selected;
-      body.orbitLine.material.color.set(isHighlighted ? 0x38bdf8 : (body.isMoon ? 0x64748b : 0x0284c7));
-      body.orbitLine.material.opacity = isHighlighted ? 0.9 : (body.isMoon ? 0.35 : 0.55);
+      body.orbitLine.material.color.set(isHighlighted ? 0x38bdf8 : (body.isMoon ? 0x94a3b8 : 0x0ea5e9));
+      body.orbitLine.material.opacity = isHighlighted ? 0.95 : (body.isMoon ? 0.45 : 0.65);
       body.orbitLine.visible = true;
     }
   }

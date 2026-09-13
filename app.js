@@ -783,7 +783,7 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
   }
 
   function updateOrbitLines() {
-    const showOrbits = $('showOrbits')?.checked ?? true;
+    const showOrbits = ($('showOrbits')?.checked ?? true) && ($('showTrails')?.checked ?? true);
     for (const body of bodies) {
       if (!body.orbitLine) continue;
       if (!showOrbits || !body.parentId || body.type === 'star') {
@@ -1663,12 +1663,6 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     });
 
     // New Planet Studio
-    $('closeCreator')?.addEventListener('click', () => {
-      $('creator').hidden = true;
-      climateZonesGroup.userData.hostId = null;
-      updateHabitableZones3D();
-    });
-
     document.querySelectorAll('input[name="spawnType"]').forEach(radio => {
       radio.addEventListener('change', (e) => {
         document.querySelectorAll('.archetype-card').forEach(c => c.classList.toggle('active', c.contains(e.target)));

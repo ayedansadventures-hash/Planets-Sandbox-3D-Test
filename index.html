@@ -120,8 +120,15 @@
   <!-- RIGHT CONTEXTUAL OBSERVATORY CONSOLE -->
   <aside id="inspector" class="inspector-panel" hidden>
     <div class="panel-header">
-      <p class="eyebrow">BODY OBSERVATORY</p>
-      <button id="closeInspector" class="btn-close" aria-label="Close Inspector">×</button>
+      <div class="panel-header-drag" title="Drag to reposition panel">
+        <span class="drag-handle">✥</span>
+        <p class="eyebrow">BODY OBSERVATORY</p>
+      </div>
+      <div class="panel-header-controls">
+        <button class="btn-scale" data-action="scale-down" title="Scale Down (Make Smaller)">－</button>
+        <button class="btn-scale" data-action="scale-up" title="Scale Up (Make Larger)">＋</button>
+        <button id="closeInspector" class="btn-close" aria-label="Close Inspector">×</button>
+      </div>
     </div>
 
     <div class="body-hero-card">
@@ -333,13 +340,21 @@
     <div class="inspector-footer">
       <button id="remove" class="btn btn-danger" style="width: 100%;"><span>🗑️</span> Remove Selected Body</button>
     </div>
+    <div class="panel-resize-grip" title="Drag corner to scale panel">⤡</div>
   </aside>
 
   <!-- NEW PLANET LAUNCHER STUDIO -->
   <aside id="creator" class="launcher-panel" hidden>
     <div class="panel-header">
-      <p class="eyebrow">NEW WORLD STUDIO</p>
-      <button id="closeCreator" class="btn-close" aria-label="Close Launcher">×</button>
+      <div class="panel-header-drag" title="Drag to reposition panel">
+        <span class="drag-handle">✥</span>
+        <p class="eyebrow">NEW WORLD STUDIO</p>
+      </div>
+      <div class="panel-header-controls">
+        <button class="btn-scale" data-action="scale-down" title="Scale Down (Make Smaller)">－</button>
+        <button class="btn-scale" data-action="scale-up" title="Scale Up (Make Larger)">＋</button>
+        <button id="closeCreator" class="btn-close" aria-label="Close Launcher">×</button>
+      </div>
     </div>
 
     <h2>Spawn New Object</h2>
@@ -501,6 +516,7 @@
     <button id="placeCustom" class="btn btn-action" style="width:100%; margin-top: 14px;">
       ✦ Click Anywhere on Screen to Spawn!
     </button>
+    <div class="panel-resize-grip" title="Drag corner to scale panel">⤡</div>
   </aside>
 
   <!-- NOTIFICATION TOAST -->

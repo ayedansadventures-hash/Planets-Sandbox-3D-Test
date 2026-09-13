@@ -259,9 +259,67 @@ button, select, input { font: inherit; color: inherit; }
   flex-direction: column;
   padding: 10px;
   overflow-y: auto;
+  transform: scale(var(--panel-scale, 1));
+  transform-origin: top left;
+  user-select: auto;
 }
-.panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  user-select: none;
+}
+.panel-header-drag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: grab;
+  padding: 2px 4px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+  flex: 1;
+}
+.panel-header-drag:hover {
+  background: rgba(56, 189, 248, 0.1);
+}
+.panel-header-drag:active {
+  cursor: grabbing;
+  background: rgba(56, 189, 248, 0.2);
+}
+.drag-handle {
+  font-size: 11px;
+  color: var(--cyan-neon);
+  opacity: 0.85;
+}
 .eyebrow { font-size: 8px; font-weight: 800; letter-spacing: 1.2px; color: var(--cyan-neon); }
+.panel-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.btn-scale {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.btn-scale:hover {
+  background: rgba(56, 189, 248, 0.25);
+  border-color: var(--cyan-neon);
+  color: #fff;
+  transform: scale(1.08);
+}
 .btn-close {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -282,6 +340,26 @@ button, select, input { font: inherit; color: inherit; }
   border-color: #ef4444;
   color: #fff;
   transform: scale(1.08);
+}
+.panel-resize-grip {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 18px;
+  height: 18px;
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+  color: var(--cyan-neon);
+  opacity: 0.65;
+  cursor: nwse-resize;
+  user-select: none;
+  z-index: 5;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.panel-resize-grip:hover {
+  opacity: 1;
+  transform: scale(1.25);
 }
 
 .body-hero-card {
@@ -382,6 +460,9 @@ button, select, input { font: inherit; color: inherit; }
   flex-direction: column;
   padding: 10px;
   overflow-y: auto;
+  transform: scale(var(--panel-scale, 1));
+  transform-origin: top left;
+  user-select: auto;
 }
 .launcher-panel h2 { font-family: 'Space Grotesk', sans-serif; font-size: 15px; color: #fff; margin-bottom: 2px; }
 

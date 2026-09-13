@@ -39,10 +39,66 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
   const sunlight = new T.PointLight(0xfff7e6, 80, 0, 0.2);
   scene.add(sunlight);
 
+  // 360° Seamless Equirectangular Solar Photosphere Generator
+  // Eliminates flat telescope photo golf-ball artifact with seamless spherical plasma noise
+  function generateSeamlessSunTexture() {
+    const w = 1024, h = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    const imgData = ctx.createImageData(w, h);
+    const data = imgData.data;
+
+    for (let y = 0; y < h; y++) {
+      const v = y / h;
+      const phi = v * Math.PI;
+      const sinPhi = Math.sin(phi);
+      const cosPhi = Math.cos(phi);
+
+      for (let x = 0; x < w; x++) {
+        const u = x / w;
+        const theta = u * Math.PI * 2;
+        const nx = sinPhi * Math.cos(theta);
+        const ny = cosPhi;
+        const nz = sinPhi * Math.sin(theta);
+
+        // Convective granulation & turbulent filaments (seamless 3D spherical harmonics)
+        const n1 = Math.sin(nx * 20 + Math.cos(ny * 20)) * Math.cos(nz * 20 + Math.sin(nx * 20));
+        const n2 = Math.sin(nx * 42 + nz * 42) * Math.sin(ny * 42);
+        const n3 = Math.cos(nx * 84 - ny * 84) * Math.sin(nz * 84);
+        const gran = (n1 * 0.45 + n2 * 0.35 + n3 * 0.2 + 1) * 0.5;
+
+        // Differential solar rotation and convective loops
+        const band = Math.sin(ny * 9 + Math.sin(nx * 14 + nz * 14) * 1.2);
+        const flux = Math.max(0, Math.sin(nx * 6 + ny * 6 + nz * 6) * 0.35 + band * 0.25);
+
+        // Radiant heat distribution: incandescent white-gold core to fiery solar amber
+        const heat = Math.min(1, Math.max(0, 0.52 + gran * 0.36 + flux * 0.22));
+        const r = Math.floor(238 + heat * 17);
+        const g = Math.floor(165 + heat * 85);
+        const b = Math.floor(35 + heat * 95);
+
+        const idx = (y * w + x) * 4;
+        data[idx] = r;
+        data[idx + 1] = g;
+        data[idx + 2] = b;
+        data[idx + 3] = 255;
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+
+    const tex = new T.CanvasTexture(canvas);
+    tex.wrapS = T.RepeatWrapping;
+    tex.wrapT = T.ClampToEdgeWrapping;
+    tex.colorSpace = T.SRGBColorSpace;
+    return tex;
+  }
+
   // Texture Loader & NASA Atlas Cache
   const textureLoader = new T.TextureLoader();
   const nasaTextures = {
-    sun: textureLoader.load('assets/sun.jpg'),
+    sun: generateSeamlessSunTexture(),
     mercury: textureLoader.load('assets/mercury.jpg'),
     venus: textureLoader.load('assets/venus.jpg'),
     earth: textureLoader.load('assets/earth.jpg'),
@@ -363,24 +419,40 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
         roughness: 0.35,
         metalness: 0.05
       });
-    } else if (isHole) {
-      b.material = new T.MeshBasicMaterial({ color: 0x000000 });
+      b.mesh = new T.Mesh(sphereGeo, b.material);
+      b.mesh.userData.body = b;
+      b.mesh.scale.setScalar(b.radius);
+      b.mesh.rotation.z = T.MathUtils.degToRad(b.tilt);
+      scene.add(b.mesh);
     } else {
-      b.material = new T.MeshStandardMaterial({
-        map: b.textureMap,
-        color: b.textureMap ? 0xffffff : new T.Color(b.color),
-        roughness: 0.72,
-        metalness: 0.05
+      // Hollow circular outline: transparent sphere collider for raycasting, thin glowing ring outline for visuals
+      b.material = new T.MeshBasicMaterial({
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        colorWrite: false
       });
+      b.mesh = new T.Mesh(sphereGeo, b.material);
+      b.mesh.userData.body = b;
+      b.mesh.scale.setScalar(b.radius);
+      b.mesh.rotation.z = T.MathUtils.degToRad(b.tilt);
+      scene.add(b.mesh);
+
+      // Camera-billboarded hollow circular outline ring (100% transparent interior, crisp glowing perimeter)
+      const outlineGeo = new T.RingGeometry(0.92, 1.0, 64);
+      b.outlineMesh = new T.Mesh(outlineGeo, new T.MeshBasicMaterial({
+        color: new T.Color(b.color || '#38bdf8'),
+        side: T.DoubleSide,
+        transparent: true,
+        opacity: 0.95,
+        blending: T.AdditiveBlending,
+        depthWrite: false
+      }));
+      b.outlineMesh.scale.setScalar(b.radius);
+      scene.add(b.outlineMesh);
     }
 
-    b.mesh = new T.Mesh(sphereGeo, b.material);
-    b.mesh.userData.body = b;
-    b.mesh.scale.setScalar(b.radius);
-    b.mesh.rotation.z = T.MathUtils.degToRad(b.tilt);
-    scene.add(b.mesh);
-
-    // Atmospheric Scattering Rim Mesh (FrontSide for non-hollow globe)
+    // Atmospheric Scattering Rim Mesh (disabled for planets so interior remains 100% hollow)
     b.atmosphere = new T.Mesh(sphereGeo, new T.ShaderMaterial({
       transparent: true,
       side: T.FrontSide,
@@ -415,7 +487,7 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       `
     }));
     b.atmosphere.scale.setScalar(b.radius * 1.025);
-    b.atmosphere.visible = !isStar && !isHole && b.atmo > 0;
+    b.atmosphere.visible = false; // Kept false so planet interiors stay 100% hollow
     scene.add(b.atmosphere);
 
     // Magnetosphere Loops (Planets only, NOT Stars or Black Holes!)
@@ -445,13 +517,28 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       createRingsMesh(b);
     }
 
-    // Orbit Guide LineLoop (visible by default for all orbiting bodies)
+    // Orbit Guide LineLoop (Keplerian analytical orbit)
     b.orbitLine = new T.LineLoop(
       new T.BufferGeometry(),
       new T.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.45, blending: T.AdditiveBlending, depthWrite: false })
     );
     b.orbitLine.visible = !isStar && !isHole;
     orbitGuidesGroup.add(b.orbitLine);
+
+    // Motion Ribbon Trail (Dynamic historical path through space)
+    b.trailHistory = [];
+    b.trailLine = new T.Line(
+      new T.BufferGeometry(),
+      new T.LineBasicMaterial({
+        color: new T.Color(b.color || '#38bdf8'),
+        transparent: true,
+        opacity: 0.4,
+        blending: T.AdditiveBlending,
+        depthWrite: false
+      })
+    );
+    b.trailLine.visible = Boolean($('showTrails')?.checked);
+    scene.add(b.trailLine);
 
     bodies.push(b);
     updateTargetSelectors();
@@ -482,8 +569,18 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
 
   function destroyBody(b) {
     if (!b) return;
-    for (const key of ['mesh', 'atmosphere', 'glow', 'ringMesh', 'field']) {
+    for (const key of ['mesh', 'outlineMesh', 'atmosphere', 'glow', 'ringMesh', 'field', 'trailLine']) {
       if (b[key]) scene.remove(b[key]);
+    }
+    if (b.outlineMesh) {
+      b.outlineMesh.geometry.dispose();
+      b.outlineMesh.material.dispose();
+      b.outlineMesh = null;
+    }
+    if (b.trailLine) {
+      b.trailLine.geometry.dispose();
+      b.trailLine.material.dispose();
+      b.trailLine = null;
     }
     if (b.orbitLine) {
       orbitGuidesGroup.remove(b.orbitLine);
@@ -728,9 +825,12 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
 
     // Semi-major axis
     const invA = 2 / r - v2 / mu;
-    if (invA <= 1e-6) return null; // Escape trajectory
-    const a = 1 / invA;
-    if (a <= 0 || a > 1000) return null;
+    let a;
+    if (invA <= 1e-6) {
+      a = Math.min(300, Math.max(0.1, r * 1.5)); // Bounded osculating trajectory for close encounters
+    } else {
+      a = Math.min(600, Math.max(0.01, 1 / invA));
+    }
 
     // Eccentricity vector e = (v x h)/mu - r/|r|
     const vxh_x = (vy * hz - vz * hy) / mu;
@@ -739,8 +839,8 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     const ex = vxh_x - rx / r;
     const ey = vxh_y - ry / r;
     const ez = vxh_z - rz / r;
-    const e = Math.hypot(ex, ey, ez);
-    if (e >= 0.98) return null;
+    const rawE = Math.hypot(ex, ey, ez);
+    const e = Math.min(0.96, isNaN(rawE) ? 0 : rawE);
 
     const b = a * Math.sqrt(Math.max(0.01, 1 - e * e));
 
@@ -749,7 +849,7 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
 
     let px, py, pz, qx, qy, qz;
     if (e >= 0.04) {
-      px = ex / e; py = ey / e; pz = ez / e;
+      px = ex / (e || 1); py = ey / (e || 1); pz = ez / (e || 1);
       qx = wy * pz - wz * py;
       qy = wz * px - wx * pz;
       qz = wx * py - wy * px;
@@ -757,7 +857,7 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       let rx0 = 1, ry0 = 0, rz0 = 0;
       if (Math.abs(wx) > 0.9) { rx0 = 0; ry0 = 1; rz0 = 0; }
       let ux = ry0 * wz - rz0 * wy, uy = rz0 * wx - rx0 * wz, uz = rx0 * wy - ry0 * wx;
-      const uLen = Math.hypot(ux, uy, uz);
+      const uLen = Math.hypot(ux, uy, uz) || 1;
       px = ux / uLen; py = uy / uLen; pz = uz / uLen;
       qx = wy * pz - wz * py;
       qy = wz * px - wx * pz;
@@ -783,7 +883,7 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
   }
 
   function updateOrbitLines() {
-    const showOrbits = ($('showOrbits')?.checked ?? true) && ($('showTrails')?.checked ?? true);
+    const showOrbits = $('showOrbits')?.checked ?? true;
     for (const body of bodies) {
       if (!body.orbitLine) continue;
       if (!showOrbits || !body.parentId || body.type === 'star') {
@@ -1137,8 +1237,9 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
         b.atmo = Math.max(0, (b.atmo || 1.0) - 0.35 / d);
         b.temp = Math.max(b.temp || 288, 1450 + 350 / d);
         b.color = '#ff3b00';
-        b.material.color.set('#ff3b00');
-        b.material.emissive.set('#ff2200');
+        if (b.material.color) b.material.color.set('#ff3b00');
+        if (b.material.emissive) b.material.emissive.set('#ff2200');
+        if (b.outlineMesh) b.outlineMesh.material.color.set('#ff3b00');
 
         // Sustained mass evaporation
         if (b.initialMass === undefined) b.initialMass = b.mass;
@@ -1197,8 +1298,9 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     star.atmo = 0;
     if (star.glow) { scene.remove(star.glow); star.glow = null; }
     star.material.map = null;
-    star.material.color.set('#000000');
-    star.material.emissive.set('#000000');
+    if (star.material.color) star.material.color.set('#000000');
+    if (star.material.emissive) star.material.emissive.set('#000000');
+    if (star.outlineMesh) star.outlineMesh.material.color.set('#555555');
     createRingsMesh(star);
 
     selectBody(star);
@@ -1313,8 +1415,123 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     el.fadeTimer = setTimeout(() => { el.style.opacity = '0'; }, 4000);
   }
 
+  // 12. INTERACTIVE DRAGGABLE & SCALABLE MENU SYSTEM
+  function makeDraggableAndScalable(panelEl) {
+    if (!panelEl) return;
+    let currentScale = 1.0;
+    panelEl.style.setProperty('--panel-scale', currentScale);
+
+    // Zoom buttons
+    const downBtn = panelEl.querySelector('.btn-scale[data-action="scale-down"]');
+    const upBtn = panelEl.querySelector('.btn-scale[data-action="scale-up"]');
+
+    function setScale(s) {
+      currentScale = Math.min(1.6, Math.max(0.6, Math.round(s * 100) / 100));
+      panelEl.style.setProperty('--panel-scale', currentScale);
+    }
+
+    downBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setScale(currentScale - 0.1);
+      showToast(`Panel scale: ${Math.round(currentScale * 100)}%`);
+    });
+
+    upBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setScale(currentScale + 0.1);
+      showToast(`Panel scale: ${Math.round(currentScale * 100)}%`);
+    });
+
+    // Corner resize grip
+    const grip = panelEl.querySelector('.panel-resize-grip');
+    if (grip) {
+      let isResizing = false;
+      let startX = 0, startScale = 1.0;
+
+      grip.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        isResizing = true;
+        startX = e.clientX;
+        startScale = currentScale;
+        grip.setPointerCapture(e.pointerId);
+      });
+
+      grip.addEventListener('pointermove', (e) => {
+        if (!isResizing) return;
+        const dx = e.clientX - startX;
+        const deltaScale = dx / 220;
+        setScale(startScale + deltaScale);
+      });
+
+      const endResize = (e) => {
+        if (isResizing) {
+          isResizing = false;
+          try { grip.releasePointerCapture(e.pointerId); } catch (_) {}
+        }
+      };
+      grip.addEventListener('pointerup', endResize);
+      grip.addEventListener('pointercancel', endResize);
+    }
+
+    // Dragging Header
+    const header = panelEl.querySelector('.panel-header-drag') || panelEl.querySelector('.panel-header');
+    if (header) {
+      let isDragging = false;
+      let startMouseX = 0, startMouseY = 0;
+      let startLeft = 0, startTop = 0;
+
+      header.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) return;
+        e.preventDefault();
+        isDragging = true;
+        startMouseX = e.clientX;
+        startMouseY = e.clientY;
+
+        const rect = panelEl.getBoundingClientRect();
+        startLeft = rect.left;
+        startTop = rect.top;
+
+        panelEl.style.left = `${startLeft}px`;
+        panelEl.style.top = `${startTop}px`;
+        panelEl.style.right = 'auto';
+        panelEl.style.bottom = 'auto';
+
+        header.setPointerCapture(e.pointerId);
+      });
+
+      header.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - startMouseX;
+        const dy = e.clientY - startMouseY;
+
+        let newLeft = startLeft + dx;
+        let newTop = startTop + dy;
+
+        const pad = 10;
+        newLeft = Math.max(pad, Math.min(window.innerWidth - 60, newLeft));
+        newTop = Math.max(pad, Math.min(window.innerHeight - 60, newTop));
+
+        panelEl.style.left = `${newLeft}px`;
+        panelEl.style.top = `${newTop}px`;
+      });
+
+      const endDrag = (e) => {
+        if (isDragging) {
+          isDragging = false;
+          try { header.releasePointerCapture(e.pointerId); } catch (_) {}
+        }
+      };
+      header.addEventListener('pointerup', endDrag);
+      header.addEventListener('pointercancel', endDrag);
+    }
+  }
+
   // 13. EVENT WIRING & INTERACTION
   function bindEvents() {
+    makeDraggableAndScalable($('inspector'));
+    makeDraggableAndScalable($('creator'));
+
     // UI Visibility Toggle (Clean Space Mode)
     const toggleUI = () => {
       const isHidden = document.body.classList.toggle('ui-hidden');
@@ -1468,8 +1685,9 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       selected.isBlackHole = true;
       selected.color = '#000000';
       selected.material.map = null;
-      selected.material.color.set('#000000');
-      selected.material.emissive.set('#000000');
+      if (selected.material.color) selected.material.color.set('#000000');
+      if (selected.material.emissive) selected.material.emissive.set('#000000');
+      if (selected.outlineMesh) selected.outlineMesh.material.color.set('#444444');
       createRingsMesh(selected);
       selectBody(selected);
       showToast(`${selected.name} collapsed into a black hole`);
@@ -1519,10 +1737,13 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
         showToast("No parent body found to orbit");
         return;
       }
-      const dx = selected.p[0] - parent.p[0], dy = selected.p[1] - parent.p[1], dz = selected.p[2] - parent.p[2];
-      const distAU = Math.max(0.01, Math.hypot(dx, dy, dz));
+      const dx = selected.p[0] - parent.p[0];
+      const dz = selected.p[2] - parent.p[2];
+      const distAU = Math.max(0.01, Math.hypot(dx, dz));
       const speed = Math.sqrt(G * (parent.mass + selected.mass) / distAU);
       const angle = Math.atan2(dz, dx);
+      // Project into parent's orbital plane and apply pure circular tangential velocity
+      selected.p[1] = parent.p[1];
       selected.v[0] = parent.v[0] - Math.sin(angle) * speed;
       selected.v[1] = parent.v[1];
       selected.v[2] = parent.v[2] + Math.cos(angle) * speed;
@@ -1531,7 +1752,7 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       showToast(`Stabilized circular Keplerian orbit for ${selected.name} (${(speed * AU_YEAR_TO_KM_S).toFixed(1)} km/s)`);
     });
 
-    // Display Toggles (Grid, Axes, Trails, Velocity, Labels)
+    // Display Toggles (Grid, Axes, Orbits, Trails, Velocity, Labels)
     $('showGrid')?.addEventListener('change', (e) => {
       gridHelper.visible = e.target.checked;
       showToast(gridHelper.visible ? "Orbital reference grid ON" : "Orbital grid OFF");
@@ -1540,12 +1761,16 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       axesHelper.visible = e.target.checked;
       showToast(axesHelper.visible ? "Cartesian axes ON" : "Axes OFF");
     });
+    $('showOrbits')?.addEventListener('change', (e) => {
+      updateOrbitLines();
+      showToast(e.target.checked ? "Keplerian orbit lines ON" : "Orbit lines OFF");
+    });
     $('showTrails')?.addEventListener('change', (e) => {
       const show = e.target.checked;
       bodies.forEach(b => {
-        if (b.orbitLine) b.orbitLine.visible = show;
+        if (b.trailLine) b.trailLine.visible = show;
       });
-      showToast(show ? "Orbit lines & trails ON" : "Orbit lines OFF");
+      showToast(show ? "Motion ribbon trails ON" : "Motion trails OFF");
     });
     $('showLabels')?.addEventListener('change', (e) => {
       showToast(e.target.checked ? "Planet telemetry labels ON" : "Planet labels OFF");
@@ -1757,6 +1982,10 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
         const hit = new T.Vector3();
         if (raycaster.ray.intersectPlane(plane, hit)) {
           spawnPlacedObject(hit);
+        } else {
+          raycaster.ray.at(30, hit);
+          hit.y = 0;
+          spawnPlacedObject(hit);
         }
       }
     });
@@ -1804,7 +2033,7 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       p: pWorld,
       v: [vx, 0, vz],
       parentId: parent?.id || null,
-      ring: false
+      ring: Boolean($('customRings')?.checked)
     };
 
     if (spawnType === 'customPlanet') {
@@ -1816,6 +2045,12 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       bodySpec.water = parseFloat($('customWater')?.value || '55');
       bodySpec.gasType = $('launchCustomGas')?.value || 'earthAir';
       bodySpec.ring = Boolean($('customRings')?.checked);
+    } else if (spawnType === 'moon') {
+      bodySpec.mass = 0.012 / EARTHS_PER_SUN;
+      bodySpec.radius = 0.20;
+      bodySpec.color = '#94a3b8';
+      bodySpec.isMoon = true;
+      bodySpec.type = 'moon';
     } else if (spawnType === 'gasGiant') {
       bodySpec.mass = 120 / EARTHS_PER_SUN;
       bodySpec.radius = 0.88;
@@ -1903,8 +2138,9 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
                 b.isLavaWorld = false;
                 b.type = 'rock';
                 b.color = '#38bdf8';
-                b.material.color.set('#38bdf8');
-                b.material.emissive.set('#000000');
+                if (b.material.color) b.material.color.set('#38bdf8');
+                if (b.material.emissive) b.material.emissive.set('#000000');
+                if (b.outlineMesh) b.outlineMesh.material.color.set('#38bdf8');
                 if (!b.cooledNotified) {
                   b.cooledNotified = true;
                   showToast(`🌱 BIOGENESIS: ${b.name} cooled down in the Habitable Zone! Crust solidified and oceans formed!`);
@@ -1926,10 +2162,32 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       b.mesh.position.set(b.p[0] * AU, b.p[1] * AU, b.p[2] * AU);
       if (playing) b.mesh.rotation.y += deltaSec * (24 / Math.max(1, b.dayLength)) * 0.1;
 
+      if (b.outlineMesh) {
+        b.outlineMesh.position.copy(b.mesh.position);
+        b.outlineMesh.quaternion.copy(camera.quaternion);
+        b.outlineMesh.scale.setScalar(b.radius);
+      }
       if (b.atmosphere) b.atmosphere.position.copy(b.mesh.position);
       if (b.field) b.field.position.copy(b.mesh.position);
       if (b.glow) b.glow.position.copy(b.mesh.position);
       if (b.ringMesh) b.ringMesh.position.copy(b.mesh.position);
+    }
+
+    // Motion Ribbon Trails Update (historical flight path)
+    const showTrails = $('showTrails')?.checked ?? true;
+    for (const b of bodies) {
+      if (b.trailLine) {
+        if (!showTrails || b.type === 'star') {
+          b.trailLine.visible = false;
+        } else {
+          b.trailLine.visible = true;
+          if (playing) {
+            b.trailHistory.push(b.mesh.position.clone());
+            if (b.trailHistory.length > 70) b.trailHistory.shift();
+            b.trailLine.geometry.setFromPoints(b.trailHistory);
+          }
+        }
+      }
     }
 
     // Asteroid Belt Rotation locked to simulation time (slows down or stops with sim!)
@@ -1960,8 +2218,11 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     if (selected) {
       selectionRing.position.copy(selected.mesh.position);
       selectionRing.quaternion.copy(camera.quaternion);
-      selectionRing.scale.setScalar(selected.radius * 1.3);
+      selectionRing.scale.setScalar(selected.radius * 1.35);
       selectionRing.material.color.set(selected.type === 'star' ? 0xf59e0b : 0x38bdf8);
+      selectionRing.visible = true;
+    } else {
+      selectionRing.visible = false;
     }
 
     updateOrbitLines();

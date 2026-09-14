@@ -1025,7 +1025,8 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
             water: 2,
             ice: 15,
             magnetic: 0.02,
-            gravityScale: 6.5,
+            gravityScale: 1.0,
+            tidalImmune: true,
             isMoon: true
           }, distAU, angle, inc);
         };
@@ -1184,7 +1185,10 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
         let a = bodies[i], b = bodies[j];
         const dx = b.p[0] - a.p[0], dy = b.p[1] - a.p[1], dz = b.p[2] - a.p[2];
         const dist = Math.hypot(dx, dy, dz);
-        const colDist = (a.radius + b.radius) / AU * 0.55;
+        // Realistic collision boundary: avoid false merges between host planet and bound moon
+        const isParentChild = (a.parentId === b.id || b.parentId === a.id);
+        const colMultiplier = isParentChild ? 0.35 : 0.50;
+        const colDist = (a.radius + b.radius) / AU * colMultiplier;
 
         if (dist >= colDist) continue;
 
@@ -1437,7 +1441,7 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
   // 12. INTERACTIVE DRAGGABLE & SCALABLE MENU SYSTEM
   function makeDraggableAndScalable(panelEl) {
     if (!panelEl) return;
-    let currentScale = 1.0;
+    let currentScale = 0.82;
     panelEl.style.setProperty('--panel-scale', currentScale);
 
     // Zoom buttons

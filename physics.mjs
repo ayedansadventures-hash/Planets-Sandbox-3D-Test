@@ -8,12 +8,32 @@ export function computeAccelerations(bodies) {
   const acc = new Array(n);
   for (let i = 0; i < n; i++) acc[i] = [0, 0, 0];
 
+  const bodyMap = new Map();
   for (let i = 0; i < n; i++) {
+    const b = bodies[i];
+    if (b.id != null) bodyMap.set(String(b.id), { idx: i, body: b });
+  }
+
+  // Identify bound moons whose parent planet/star exists in the system
+  const isBoundMoon = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const b = bodies[i];
+    isBoundMoon[i] = Boolean(
+      (b.isMoon || b.type === 'moon') &&
+      b.parentId != null &&
+      bodyMap.has(String(b.parentId))
+    );
+  }
+
+  // 1. Primary bodies (all non-moons or orphaned moons) interact via full N-body gravitation
+  for (let i = 0; i < n; i++) {
+    if (isBoundMoon[i]) continue;
     const a = bodies[i];
     const aMass = a.mass || 1e-9;
     const aGrav = a.gravityScale ?? a.gravity ?? 1;
 
     for (let j = i + 1; j < n; j++) {
+      if (isBoundMoon[j]) continue;
       const b = bodies[j];
       const bMass = b.mass || 1e-9;
       const bGrav = b.gravityScale ?? b.gravity ?? 1;
@@ -44,6 +64,71 @@ export function computeAccelerations(bodies) {
       acc[j][2] -= factor * aMass * dz;
     }
   }
+
+  // 2. Bound moons:
+  // - Inherit parent's external acceleration in the inertial frame (Equivalence Principle)
+  // - Apply local 2-body Keplerian gravity towards their host planet
+  // - Allow sibling moons around the same parent planet to perturb each other
+  for (let i = 0; i < n; i++) {
+    if (!isBoundMoon[i]) continue;
+    const moon = bodies[i];
+    const parentEntry = bodyMap.get(String(moon.parentId));
+    if (!parentEntry) continue;
+    const pIdx = parentEntry.idx;
+    const parent = parentEntry.body;
+
+    // Inherit the parent planet's acceleration from the Sun and other bodies
+    acc[i][0] = acc[pIdx][0];
+    acc[i][1] = acc[pIdx][1];
+    acc[i][2] = acc[pIdx][2];
+
+    // Local Keplerian gravitational attraction between moon and parent
+    const dx = parent.p[0] - moon.p[0];
+    const dy = parent.p[1] - moon.p[1];
+    const dz = parent.p[2] - moon.p[2];
+    const distSq = dx * dx + dy * dy + dz * dz;
+    const r2 = Math.max(distSq, 1e-12);
+    const invR = 1 / Math.sqrt(r2);
+    const invR3 = invR * invR * invR;
+
+    const parentMass = parent.mass || 1e-9;
+    const moonMass = moon.mass || 1e-9;
+    const mGrav = moon.gravityScale ?? moon.gravity ?? 1;
+    const pGrav = parent.gravityScale ?? parent.gravity ?? 1;
+    const pairScale = mGrav * pGrav;
+
+    // Acceleration on the moon towards the parent
+    const factorMoon = G * pairScale * (parentMass + moonMass) * invR3;
+    acc[i][0] += factorMoon * dx;
+    acc[i][1] += factorMoon * dy;
+    acc[i][2] += factorMoon * dz;
+
+    // Sibling moons around the same parent
+    for (let j = i + 1; j < n; j++) {
+      if (!isBoundMoon[j]) continue;
+      const sibling = bodies[j];
+      if (String(sibling.parentId) !== String(moon.parentId)) continue;
+
+      const sx = sibling.p[0] - moon.p[0];
+      const sy = sibling.p[1] - moon.p[1];
+      const sz = sibling.p[2] - moon.p[2];
+      const sDistSq = sx * sx + sy * sy + sz * sz;
+      const sR2 = Math.max(sDistSq, 1e-12);
+      const sInvR = 1 / Math.sqrt(sR2);
+      const sInvR3 = sInvR * sInvR * sInvR;
+
+      const sFactor = G * (sibling.mass || 1e-9) * sInvR3;
+      acc[i][0] += sFactor * sx;
+      acc[i][1] += sFactor * sy;
+      acc[i][2] += sFactor * sz;
+
+      const mFactor = G * moonMass * sInvR3;
+      acc[j][0] -= mFactor * sx;
+      acc[j][1] -= mFactor * sy;
+      acc[j][2] -= mFactor * sz;
+    }
+  }
+
   return acc;
 }
 

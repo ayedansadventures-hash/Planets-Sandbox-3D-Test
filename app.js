@@ -261,90 +261,183 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
   const starGlowMap = createHaloTexture('#ffd5a0');
 
   function generateProceduralTexture(spec) {
-    const c = document.createElement('canvas'); c.width = 512; c.height = 256;
+    const c = document.createElement('canvas'); c.width = 1024; c.height = 512;
     const x = c.getContext('2d');
-    const r = rng(spec.id * 1013 + 37);
+    const r = rng(spec.id * 1013 + (spec.name ? spec.name.charCodeAt(0) * 31 : 37));
+
+    const name = (spec.name || '').toLowerCase();
+    const isGas = spec.type === 'gas' || spec.type === 'gasGiant';
 
     if (spec.type === 'hotPlanet' || spec.isLavaWorld) {
       // Hot Volcanic Molten Lava World
-      x.fillStyle = '#1c1917'; x.fillRect(0, 0, 512, 256);
-      x.lineWidth = 3;
-      for (let i = 0; i < 40; i++) {
+      x.fillStyle = '#1c1917'; x.fillRect(0, 0, 1024, 512);
+      x.lineWidth = 4;
+      for (let i = 0; i < 70; i++) {
         x.strokeStyle = r() > 0.5 ? '#dc2626' : '#f97316';
         x.beginPath();
-        let px = r() * 512, py = r() * 256;
+        let px = r() * 1024, py = r() * 512;
         x.moveTo(px, py);
         for (let seg = 0; seg < 6; seg++) {
-          px += (r() - 0.5) * 60; py += (r() - 0.5) * 40;
+          px += (r() - 0.5) * 80; py += (r() - 0.5) * 60;
           x.lineTo(px, py);
         }
         x.stroke();
       }
-      for (let i = 0; i < 60; i++) {
+      for (let i = 0; i < 90; i++) {
         x.fillStyle = r() > 0.4 ? '#fef08a' : '#f97316';
-        x.beginPath(); x.arc(r() * 512, r() * 256, r() * 12 + 2, 0, Math.PI * 2); x.fill();
+        x.beginPath(); x.arc(r() * 1024, r() * 512, r() * 16 + 3, 0, Math.PI * 2); x.fill();
       }
-    } else if (spec.type === 'gas' || spec.type === 'gasGiant') {
-      // Banded Gas Giant
-      const count = spec.bandCount || 10;
-      const palette = spec.bandColors || ['#d7ad7d', '#c89d6d', '#e2cbb0', '#9c7b58'];
-      for (let y = 0; y < 256; y++) {
-        const idx = Math.floor((y / 256) * count) % palette.length;
+    } else if (name === 'mercury' || (spec.type === 'rock' && (spec.water || 0) === 0 && (spec.atmo || 0) === 0 && spec.color === '#9e9389')) {
+      // Mercury: Cratered Highlands & Dark Basaltic Impact Basins
+      x.fillStyle = '#6b7280'; x.fillRect(0, 0, 1024, 512);
+      for (let i = 0; i < 25; i++) {
+        x.fillStyle = '#4b5563';
+        x.beginPath();
+        x.ellipse(r() * 1024, r() * 512, 40 + r() * 100, 30 + r() * 70, r() * Math.PI, 0, Math.PI * 2);
+        x.fill();
+      }
+      for (let i = 0; i < 160; i++) {
+        const cx = r() * 1024, cy = r() * 512, rad = 3 + r() * 24;
+        x.fillStyle = '#374151';
+        x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.fill();
+        x.strokeStyle = '#9ca3af'; x.lineWidth = 1.5;
+        x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.stroke();
+      }
+    } else if (name === 'moon' || (spec.isMoon && (spec.water || 0) <= 5 && (spec.atmo || 0) === 0)) {
+      // Moon: Lunar Maria Seas & Bright Impact Highlands
+      x.fillStyle = '#9ca3af'; x.fillRect(0, 0, 1024, 512);
+      const mariaColors = ['#4b5563', '#374151', '#475569'];
+      for (let i = 0; i < 35; i++) {
+        x.fillStyle = mariaColors[Math.floor(r() * mariaColors.length)];
+        x.beginPath();
+        x.ellipse(r() * 1024, r() * 512, 50 + r() * 130, 35 + r() * 90, r() * Math.PI, 0, Math.PI * 2);
+        x.fill();
+      }
+      for (let i = 0; i < 200; i++) {
+        const cx = r() * 1024, cy = r() * 512, rad = 2 + r() * 20;
+        x.fillStyle = '#1f2937';
+        x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.fill();
+        x.strokeStyle = '#d1d5db'; x.lineWidth = 1.2;
+        x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.stroke();
+      }
+    } else if (name === 'venus') {
+      // Venus: Dense Swirling Golden Sulfuric Clouds
+      const grad = x.createLinearGradient(0, 0, 0, 512);
+      grad.addColorStop(0, '#fef08a');
+      grad.addColorStop(0.3, '#f59e0b');
+      grad.addColorStop(0.7, '#d97706');
+      grad.addColorStop(1, '#b45309');
+      x.fillStyle = grad; x.fillRect(0, 0, 1024, 512);
+      x.fillStyle = 'rgba(254, 240, 138, 0.35)';
+      for (let i = 0; i < 50; i++) {
+        const py = r() * 512;
+        x.beginPath();
+        x.ellipse(r() * 1024, py, 120 + r() * 200, 15 + r() * 35, 0.08, 0, Math.PI * 2);
+        x.fill();
+      }
+    } else if (name === 'mars') {
+      // Mars: Rusty Red Crust with Syrtis Major Volcano Basins & Polar Caps
+      x.fillStyle = '#c2410c'; x.fillRect(0, 0, 1024, 512);
+      const darkPlains = ['#7c2d12', '#451a03', '#9a3412'];
+      for (let i = 0; i < 40; i++) {
+        x.fillStyle = darkPlains[Math.floor(r() * darkPlains.length)];
+        x.beginPath();
+        x.ellipse(r() * 1024, 100 + r() * 312, 60 + r() * 140, 30 + r() * 70, r() * Math.PI, 0, Math.PI * 2);
+        x.fill();
+      }
+      x.strokeStyle = '#3b1207'; x.lineWidth = 5;
+      x.beginPath();
+      x.moveTo(350, 260); x.lineTo(580, 275); x.stroke();
+      x.fillStyle = '#f8fafc';
+      x.beginPath(); x.ellipse(512, 18, 160, 22, 0, 0, Math.PI * 2); x.fill();
+      x.beginPath(); x.ellipse(512, 494, 140, 20, 0, 0, Math.PI * 2); x.fill();
+    } else if (isGas || name === 'jupiter' || name === 'saturn' || name === 'uranus' || name === 'neptune') {
+      // Banded Gas Giants
+      let palette;
+      if (name === 'jupiter') {
+        palette = ['#e2cbb0', '#c89d6d', '#d7ad7d', '#9c7b58', '#f1d6b8', '#855b38', '#dfcfbf'];
+      } else if (name === 'saturn') {
+        palette = ['#e5d5b5', '#d4be8d', '#c2ab79', '#eedebd', '#bfa776'];
+      } else if (name === 'uranus') {
+        palette = ['#a5f3fc', '#67e8f9', '#38bdf8', '#7dd3fc'];
+      } else if (name === 'neptune') {
+        palette = ['#1e40af', '#2563eb', '#1d4ed8', '#3b82f6', '#172554'];
+      } else {
+        palette = spec.bandColors || ['#d7ad7d', '#c89d6d', '#e2cbb0', '#9c7b58'];
+      }
+
+      const count = spec.bandCount || (name === 'jupiter' ? 14 : 10);
+      for (let y = 0; y < 512; y++) {
+        const idx = Math.floor((y / 512) * count) % palette.length;
         x.fillStyle = palette[idx];
-        x.fillRect(0, y, 512, 1);
+        x.fillRect(0, y, 1024, 1);
       }
-      // Great Storm
-      if (spec.showGreatStorm !== false) {
-        x.fillStyle = spec.stormColor || '#f43f5e';
-        x.beginPath(); x.ellipse(280, 150, 42, 22, 0.1, 0, Math.PI * 2); x.fill();
+      for (let i = 0; i < 40; i++) {
+        x.fillStyle = palette[Math.floor(r() * palette.length)];
+        x.beginPath();
+        x.ellipse(r() * 1024, r() * 512, 50 + r() * 120, 6 + r() * 14, 0, 0, Math.PI * 2);
+        x.fill();
+      }
+      if (name === 'jupiter' || spec.showGreatStorm) {
+        x.fillStyle = '#b91c1c';
+        x.beginPath(); x.ellipse(620, 310, 65, 36, 0.05, 0, Math.PI * 2); x.fill();
+        x.fillStyle = '#ea580c';
+        x.beginPath(); x.ellipse(620, 310, 48, 24, 0.05, 0, Math.PI * 2); x.fill();
+        x.fillStyle = '#fef08a';
+        x.beginPath(); x.ellipse(620, 310, 20, 10, 0.05, 0, Math.PI * 2); x.fill();
+      }
+      if (name === 'neptune') {
+        x.fillStyle = '#0f172a';
+        x.beginPath(); x.ellipse(450, 280, 50, 25, 0.1, 0, Math.PI * 2); x.fill();
+        x.fillStyle = 'rgba(255, 255, 255, 0.65)';
+        x.fillRect(380, 255, 120, 3);
       }
     } else {
-      // Terrestrial Rocky World with Organic Continents, Oceans & Atmospheric Clouds
-      const water = spec.waterCoverage ?? spec.water ?? 65;
-      const oceanCol = spec.oceanColor || (water > 0 ? '#1e3a8a' : (spec.color || '#8b8c86'));
+      // Terrestrial Rocky World (Earth & custom worlds)
+      const water = spec.waterCoverage ?? spec.water ?? 70;
+      const oceanCol = spec.oceanColor || (water > 0 ? '#1d4ed8' : (spec.color || '#6b7280'));
       const landCol = spec.landColor || '#15803d';
 
       x.fillStyle = oceanCol;
-      x.fillRect(0, 0, 512, 256);
+      x.fillRect(0, 0, 1024, 512);
 
       const landShare = 1 - water / 100;
       if (landShare > 0.02) {
-        // Broad Continents
         x.fillStyle = landCol;
-        const numBlobs = Math.floor(180 * landShare);
+        const numBlobs = Math.floor(220 * landShare);
         for (let i = 0; i < numBlobs; i++) {
-          const px = r() * 512, py = 30 + r() * 196;
-          const rw = 12 + r() * 60 * landShare;
-          const rh = 8 + r() * 38 * landShare;
+          const px = r() * 1024, py = 50 + r() * 412;
+          const rw = 20 + r() * 100 * landShare;
+          const rh = 15 + r() * 65 * landShare;
           x.beginPath();
           x.ellipse(px, py, rw, rh, r() * Math.PI, 0, Math.PI * 2);
           x.fill();
         }
-        // Highland & Mountain Ridges
-        x.fillStyle = '#92400e';
-        for (let i = 0; i < numBlobs * 0.35; i++) {
-          const px = r() * 512, py = 40 + r() * 176;
+        x.fillStyle = '#78350f';
+        for (let i = 0; i < numBlobs * 0.4; i++) {
+          const px = r() * 1024, py = 70 + r() * 372;
           x.beginPath();
-          x.ellipse(px, py, 6 + r() * 20, 4 + r() * 12, r() * Math.PI, 0, Math.PI * 2);
+          x.ellipse(px, py, 10 + r() * 35, 6 + r() * 20, r() * Math.PI, 0, Math.PI * 2);
           x.fill();
         }
       }
 
-      // Atmospheric Weather Clouds
-      x.fillStyle = 'rgba(255, 255, 255, 0.28)';
-      for (let i = 0; i < 30; i++) {
-        const cy = 20 + r() * 216;
-        x.beginPath();
-        x.ellipse(r() * 512, cy, 40 + r() * 120, 4 + r() * 14, 0.05, 0, Math.PI * 2);
-        x.fill();
+      if ((spec.atmo || 0) > 0.05) {
+        x.fillStyle = 'rgba(255, 255, 255, 0.35)';
+        for (let i = 0; i < 45; i++) {
+          const cy = 40 + r() * 432;
+          x.beginPath();
+          x.ellipse(r() * 1024, cy, 60 + r() * 180, 8 + r() * 22, 0.05, 0, Math.PI * 2);
+          x.fill();
+        }
       }
 
       const ice = spec.iceCapCoverage ?? spec.ice ?? 12;
       if (ice > 0) {
         x.fillStyle = '#f8fafc';
-        const h = Math.max(4, ice * 0.65);
-        x.fillRect(0, 0, 512, h);
-        x.fillRect(0, 256 - h, 512, h);
+        const h = Math.max(8, ice * 1.3);
+        x.fillRect(0, 0, 1024, h);
+        x.fillRect(0, 512 - h, 1024, h);
       }
     }
 
@@ -412,8 +505,8 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
 
     if (isStar) {
       b.material = new T.MeshStandardMaterial({
-        map: nasaTextures.sun,
-        emissiveMap: nasaTextures.sun,
+        map: b.textureMap,
+        emissiveMap: b.textureMap,
         emissive: new T.Color(b.color || '#fff0cb'),
         emissiveIntensity: 1.6,
         roughness: 0.35,
@@ -424,35 +517,28 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       b.mesh.scale.setScalar(b.radius);
       b.mesh.rotation.z = T.MathUtils.degToRad(b.tilt);
       scene.add(b.mesh);
+    } else if (isHole) {
+      b.material = new T.MeshBasicMaterial({ color: 0x000000 });
+      b.mesh = new T.Mesh(sphereGeo, b.material);
+      b.mesh.userData.body = b;
+      b.mesh.scale.setScalar(b.radius);
+      scene.add(b.mesh);
     } else {
-      // Hollow circular outline: transparent sphere collider for raycasting, thin glowing ring outline for visuals
-      b.material = new T.MeshBasicMaterial({
-        transparent: true,
-        opacity: 0,
-        depthWrite: false,
-        colorWrite: false
+      // Photorealistic 3D textured planet globe with lighting, day/night shading, and axial tilt
+      b.material = new T.MeshStandardMaterial({
+        map: b.textureMap,
+        roughness: b.type === 'gas' ? 0.85 : 0.68,
+        metalness: b.type === 'gas' ? 0.0 : 0.06,
+        color: b.textureMap ? 0xffffff : new T.Color(b.color || '#4f9cff')
       });
       b.mesh = new T.Mesh(sphereGeo, b.material);
       b.mesh.userData.body = b;
       b.mesh.scale.setScalar(b.radius);
       b.mesh.rotation.z = T.MathUtils.degToRad(b.tilt);
       scene.add(b.mesh);
-
-      // Camera-billboarded hollow circular outline ring (100% transparent interior, crisp glowing perimeter)
-      const outlineGeo = new T.RingGeometry(0.92, 1.0, 64);
-      b.outlineMesh = new T.Mesh(outlineGeo, new T.MeshBasicMaterial({
-        color: new T.Color(b.color || '#38bdf8'),
-        side: T.DoubleSide,
-        transparent: true,
-        opacity: 0.95,
-        blending: T.AdditiveBlending,
-        depthWrite: false
-      }));
-      b.outlineMesh.scale.setScalar(b.radius);
-      scene.add(b.outlineMesh);
     }
 
-    // Atmospheric Scattering Rim Mesh (disabled for planets so interior remains 100% hollow)
+    // Atmospheric Scattering Rim Mesh
     b.atmosphere = new T.Mesh(sphereGeo, new T.ShaderMaterial({
       transparent: true,
       side: T.FrontSide,
@@ -486,8 +572,8 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
         }
       `
     }));
-    b.atmosphere.scale.setScalar(b.radius * 1.025);
-    b.atmosphere.visible = false; // Kept false so planet interiors stay 100% hollow
+    b.atmosphere.scale.setScalar(b.radius * 1.035);
+    b.atmosphere.visible = (b.atmo > 0.05) && !isStar && !isHole;
     scene.add(b.atmosphere);
 
     // Magnetosphere Loops (Planets only, NOT Stars or Black Holes!)
@@ -569,13 +655,8 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
 
   function destroyBody(b) {
     if (!b) return;
-    for (const key of ['mesh', 'outlineMesh', 'atmosphere', 'glow', 'ringMesh', 'field', 'trailLine']) {
+    for (const key of ['mesh', 'atmosphere', 'glow', 'ringMesh', 'field', 'trailLine']) {
       if (b[key]) scene.remove(b[key]);
-    }
-    if (b.outlineMesh) {
-      b.outlineMesh.geometry.dispose();
-      b.outlineMesh.material.dispose();
-      b.outlineMesh = null;
     }
     if (b.trailLine) {
       b.trailLine.geometry.dispose();
@@ -593,6 +674,12 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     if (b.ringMesh) { b.ringMesh.geometry.dispose(); b.ringMesh.material.dispose(); }
     if (b.field) { b.field.children.forEach(c => { c.geometry.dispose(); c.material.dispose(); }); }
 
+    const labelEl = bodyLabelMap.get(b.id);
+    if (labelEl) {
+      labelEl.remove();
+      bodyLabelMap.delete(b.id);
+    }
+
     bodies = bodies.filter(x => x !== b);
     bodies.forEach(x => { if (x.parentId === b.id) x.parentId = null; });
 
@@ -602,6 +689,8 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
 
   function clearAllBodies() {
     for (const b of [...bodies]) destroyBody(b);
+    bodyLabelMap.forEach(el => el.remove());
+    bodyLabelMap.clear();
     bodies = [];
     selected = null;
     following = false;
@@ -1881,7 +1970,13 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     });
 
     // Inspector Inputs Live Binding
-    $('name')?.addEventListener('input', (e) => { if (selected) { selected.name = e.target.value; $('title').textContent = e.target.value; } });
+    $('name')?.addEventListener('input', (e) => {
+      if (selected) {
+        selected.name = e.target.value;
+        $('title').textContent = e.target.value;
+        syncBodyLabels();
+      }
+    });
     $('mass')?.addEventListener('change', (e) => {
       if (selected) {
         selected.mass = Math.max(1e-9, parseFloat(e.target.value) / EARTHS_PER_SUN);
@@ -1892,6 +1987,8 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       if (selected) {
         selected.radius = parseFloat(e.target.value);
         selected.mesh.scale.setScalar(selected.radius);
+        if (selected.atmosphere) selected.atmosphere.scale.setScalar(selected.radius * 1.035);
+        if (selected.ringMesh) selected.ringMesh.scale.setScalar(selected.radius);
         $('radiusValue').textContent = `${selected.radius.toFixed(2)}×`;
       }
     });
@@ -1902,12 +1999,118 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
         $('bodyOrb').style.boxShadow = `0 0 20px ${selected.color}66`;
       }
     });
+    $('tilt')?.addEventListener('input', (e) => {
+      if (selected) {
+        selected.tilt = parseFloat(e.target.value);
+        if ($('tiltValue')) $('tiltValue').textContent = `${selected.tilt}°`;
+        selected.mesh.rotation.z = T.MathUtils.degToRad(selected.tilt);
+        if (selected.ringMesh) selected.ringMesh.rotation.z = T.MathUtils.degToRad(selected.tilt);
+      }
+    });
+    $('dayLength')?.addEventListener('input', (e) => {
+      if (selected) {
+        selected.dayLength = parseFloat(e.target.value);
+        if ($('dayValue')) $('dayValue').textContent = `${Math.round(selected.dayLength)} h`;
+      }
+    });
+    $('gravity')?.addEventListener('input', (e) => {
+      if (selected) {
+        selected.gravity = parseFloat(e.target.value);
+        selected.gravityScale = selected.gravity;
+        if ($('gravityValue')) $('gravityValue').textContent = `${selected.gravity.toFixed(2)}×`;
+        if ($('gravitySummary')) {
+          $('gravitySummary').textContent = `${formatNumber(selected.gravity * (selected.mass * EARTHS_PER_SUN) / Math.max(0.01, selected.radius ** 2), 2)} g`;
+        }
+      }
+    });
+    $('magnetic')?.addEventListener('input', (e) => {
+      if (selected) {
+        selected.magnetic = parseFloat(e.target.value);
+        selected.magneticScale = selected.magnetic;
+        if ($('magneticValue')) $('magneticValue').textContent = `${selected.magnetic.toFixed(1)}× Earth`;
+        if ($('bodyMagneticMeter')) $('bodyMagneticMeter').style.width = `${Math.min(100, (selected.magnetic / 2) * 100)}%`;
+        if (selected.field) selected.field.visible = selected.magnetic > 0;
+      }
+    });
+    $('atmo')?.addEventListener('input', (e) => {
+      if (selected) {
+        selected.atmo = parseFloat(e.target.value);
+        selected.atmoPressure = selected.atmo;
+        if ($('atmoValue')) $('atmoValue').textContent = `${selected.atmo.toFixed(2)} atm`;
+        if ($('atmosphereSummary')) $('atmosphereSummary').textContent = `${selected.atmo.toFixed(2)} atm · ${selected.gasType}`;
+        if (selected.atmosphere?.material?.uniforms?.strength) {
+          selected.atmosphere.material.uniforms.strength.value = Math.min(1.5, selected.atmo * 0.35);
+          selected.atmosphere.visible = selected.atmo > 0.05 && selected.type !== 'star' && !selected.isBlackHole;
+        }
+      }
+    });
+    $('atmoColor')?.addEventListener('input', (e) => {
+      if (selected) {
+        selected.atmoColor = e.target.value;
+        if (selected.atmosphere?.material?.uniforms?.tint) {
+          selected.atmosphere.material.uniforms.tint.value.set(selected.atmoColor);
+        }
+      }
+    });
+    $('gasTypeSelect')?.addEventListener('change', (e) => {
+      if (selected) {
+        selected.gasType = e.target.value;
+        if ($('atmosphereSummary')) $('atmosphereSummary').textContent = `${selected.atmo.toFixed(2)} atm · ${selected.gasType}`;
+      }
+    });
     $('water')?.addEventListener('input', (e) => {
       if (selected) {
         selected.water = parseFloat(e.target.value);
+        selected.waterCoverage = selected.water;
         $('waterValue').textContent = `${Math.round(selected.water)}%`;
         refreshBodyTexture(selected);
       }
+    });
+    $('ice')?.addEventListener('input', (e) => {
+      if (selected) {
+        selected.ice = parseFloat(e.target.value);
+        selected.iceCapCoverage = selected.ice;
+        if ($('iceValue')) $('iceValue').textContent = `${Math.round(selected.ice)}%`;
+        refreshBodyTexture(selected);
+      }
+    });
+    $('ocean')?.addEventListener('input', (e) => {
+      if (selected) {
+        selected.oceanColor = e.target.value;
+        refreshBodyTexture(selected);
+      }
+    });
+    $('land')?.addEventListener('input', (e) => {
+      if (selected) {
+        selected.landColor = e.target.value;
+        refreshBodyTexture(selected);
+      }
+    });
+    $('bodyHasRing')?.addEventListener('change', (e) => {
+      if (selected) {
+        selected.ring = e.target.checked;
+        createRingsMesh(selected);
+      }
+    });
+    $('bodyRingScale')?.addEventListener('input', (e) => {
+      if (selected) {
+        selected.ringScale = parseFloat(e.target.value);
+        if ($('bodyRingScaleVal')) $('bodyRingScaleVal').textContent = `${selected.ringScale.toFixed(1)}× Planet`;
+        if (selected.ring) createRingsMesh(selected);
+      }
+    });
+    $('bodyRingColor')?.addEventListener('input', (e) => {
+      if (selected) {
+        selected.ringColor = e.target.value;
+        if (selected.ring) createRingsMesh(selected);
+      }
+    });
+    ['vx', 'vy', 'vz'].forEach((axis, idx) => {
+      $(axis)?.addEventListener('change', (e) => {
+        if (selected) {
+          selected.v[idx] = parseFloat(e.target.value) || 0;
+        }
+      });
     });
 
     // New Planet Studio
@@ -1985,22 +2188,51 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     });
 
     window.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('#commandBar') || e.target.closest('#inspector') || e.target.closest('#creator') || e.target.closest('footer')) return;
+      if (e.target.closest('#commandBar') || e.target.closest('#inspector') || e.target.closest('#creator') || e.target.closest('footer') || e.target.closest('.planet-label')) return;
 
       mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
       mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
 
-      // Check Body Click Selection
+      // 1. Direct 3D Mesh Raycasting
       const intersects = raycaster.intersectObjects(bodies.map(b => b.mesh));
       if (intersects.length > 0) {
         const hitBody = intersects[0].object.userData.body;
-        selectBody(hitBody);
+        if (hitBody) {
+          selectBody(hitBody);
+          SoundEngine.playChime(640);
+          return;
+        }
+      }
+
+      // 2. Screen-Space Proximity Snapping (makes selecting small, distant planets effortless)
+      let bestBody = null;
+      let bestDist = 28; // 28px click tolerance
+      const clickX = e.clientX, clickY = e.clientY;
+      const projV = new T.Vector3();
+
+      for (const b of bodies) {
+        projV.copy(b.mesh.position).project(camera);
+        if (projV.z < 1.0) { // In front of camera
+          const sx = (projV.x * 0.5 + 0.5) * window.innerWidth;
+          const sy = (-(projV.y * 0.5) + 0.5) * window.innerHeight;
+          const dist = Math.hypot(clickX - sx, clickY - sy);
+          const screenRadius = Math.max(14, (b.radius * AU / Math.max(1, camera.position.distanceTo(b.mesh.position))) * 350);
+          const tolerance = Math.max(bestDist, screenRadius);
+          if (dist < tolerance && dist < bestDist) {
+            bestDist = dist;
+            bestBody = b;
+          }
+        }
+      }
+
+      if (bestBody) {
+        selectBody(bestBody);
         SoundEngine.playChime(640);
         return;
       }
 
-      // Check Spawn Placement
+      // 3. Spawn Placement Click
       if (!$('creator').hidden) {
         const hit = new T.Vector3();
         if (raycaster.ray.intersectPlane(plane, hit)) {
@@ -2010,6 +2242,17 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
           hit.y = 0;
           spawnPlacedObject(hit);
         }
+      }
+    });
+
+    window.addEventListener('dblclick', (e) => {
+      if (e.target.closest('#commandBar') || e.target.closest('#inspector') || e.target.closest('#creator') || e.target.closest('footer')) return;
+      if (selected) {
+        following = true;
+        controls.target.copy(selected.mesh.position);
+        followOffset.set(selected.radius * 3.5, selected.radius * 2, selected.radius * 5);
+        camera.position.copy(selected.mesh.position).add(followOffset);
+        showToast(`Camera focused on ${selected.name}`);
       }
     });
 
@@ -2114,6 +2357,62 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
   }
 
   // 14. MAIN ANIMATION & INTEGRATION LOOP
+  const labelsOverlay = $('labelsOverlay');
+  const bodyLabelMap = new Map();
+
+  function syncBodyLabels() {
+    if (!labelsOverlay) return;
+    const showLabels = $('showLabels')?.checked ?? true;
+    if (!showLabels) {
+      bodyLabelMap.forEach(el => { el.style.display = 'none'; });
+      return;
+    }
+
+    const tempV = new T.Vector3();
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+
+    for (const b of bodies) {
+      let el = bodyLabelMap.get(b.id);
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'planet-label';
+        el.textContent = b.name;
+        el.addEventListener('pointerdown', (e) => {
+          e.stopPropagation();
+          selectBody(b);
+          SoundEngine.playChime(640);
+        });
+        labelsOverlay.appendChild(el);
+        bodyLabelMap.set(b.id, el);
+      }
+
+      if (el.textContent !== b.name) el.textContent = b.name;
+      el.classList.toggle('selected-label', b === selected);
+
+      tempV.copy(b.mesh.position).project(camera);
+      // In front of camera & within visible screen margin
+      if (tempV.z < 1.0 && tempV.x >= -1.1 && tempV.x <= 1.1 && tempV.y >= -1.1 && tempV.y <= 1.1) {
+        const x = (tempV.x * 0.5 + 0.5) * w;
+        const y = (-(tempV.y * 0.5) + 0.5) * h;
+        el.style.left = `${Math.round(x)}px`;
+        el.style.top = `${Math.round(y)}px`;
+        el.style.display = 'block';
+      } else {
+        el.style.display = 'none';
+      }
+    }
+
+    // Clean up removed bodies
+    const currentIds = new Set(bodies.map(b => b.id));
+    for (const [id, el] of bodyLabelMap.entries()) {
+      if (!currentIds.has(id)) {
+        el.remove();
+        bodyLabelMap.delete(id);
+      }
+    }
+  }
+
   let lastTime = performance.now();
   function animate(now) {
     requestAnimationFrame(animate);
@@ -2163,7 +2462,6 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
                 b.color = '#38bdf8';
                 if (b.material.color) b.material.color.set('#38bdf8');
                 if (b.material.emissive) b.material.emissive.set('#000000');
-                if (b.outlineMesh) b.outlineMesh.material.color.set('#38bdf8');
                 if (!b.cooledNotified) {
                   b.cooledNotified = true;
                   showToast(`🌱 BIOGENESIS: ${b.name} cooled down in the Habitable Zone! Crust solidified and oceans formed!`);
@@ -2183,18 +2481,15 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
 
     for (const b of bodies) {
       b.mesh.position.set(b.p[0] * AU, b.p[1] * AU, b.p[2] * AU);
-      if (playing) b.mesh.rotation.y += deltaSec * (24 / Math.max(1, b.dayLength)) * 0.1;
+      if (playing) b.mesh.rotation.y += deltaSec * (24 / Math.max(0.1, b.dayLength)) * 1.2;
 
-      if (b.outlineMesh) {
-        b.outlineMesh.position.copy(b.mesh.position);
-        b.outlineMesh.quaternion.copy(camera.quaternion);
-        b.outlineMesh.scale.setScalar(b.radius);
-      }
       if (b.atmosphere) b.atmosphere.position.copy(b.mesh.position);
       if (b.field) b.field.position.copy(b.mesh.position);
       if (b.glow) b.glow.position.copy(b.mesh.position);
       if (b.ringMesh) b.ringMesh.position.copy(b.mesh.position);
     }
+
+    syncBodyLabels();
 
     // Motion Ribbon Trails Update (historical flight path)
     const showTrails = $('showTrails')?.checked ?? true;

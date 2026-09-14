@@ -23,6 +23,47 @@
 [hidden] { display: none !important; }
 body { background: var(--bg-space); color: var(--text-primary); overflow: hidden; width: 100vw; height: 100vh; }
 canvas#universe { display: block; width: 100vw; height: 100vh; touch-action: none; }
+.labels-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 5;
+}
+.planet-label {
+  position: absolute;
+  transform: translate(12px, -50%);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #f1f5f9;
+  background: rgba(8, 17, 32, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  padding: 2px 7px;
+  border-radius: 5px;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  user-select: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.planet-label:hover {
+  background: rgba(2, 132, 199, 0.85);
+  border-color: #38bdf8;
+  color: #fff;
+}
+.planet-label.selected-label {
+  border-color: #38bdf8;
+  background: rgba(14, 165, 233, 0.35);
+  color: #38bdf8;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.5);
+}
 
 /* UI HIDE & SHOW STYLES */
 body.ui-hidden .command-bar,

@@ -577,19 +577,46 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
         x.strokeStyle = '#d1d5db'; x.lineWidth = 1.2; x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.stroke();
       }
     } else if (name === 'venus') {
-      // Venus: Dense Swirling Golden Sulfuric Clouds
+      // Venus: Dense Swirling Creamy-Gold Sulfuric Cloud Deck (Photorealistic Venusian Atmosphere)
       const grad = x.createLinearGradient(0, 0, 0, 512);
-      grad.addColorStop(0, '#fef08a');
-      grad.addColorStop(0.3, '#f59e0b');
-      grad.addColorStop(0.7, '#d97706');
-      grad.addColorStop(1, '#b45309');
+      grad.addColorStop(0, '#fef9c3'); // Polar pale cream
+      grad.addColorStop(0.2, '#fef08a');
+      grad.addColorStop(0.5, '#fde047'); // Equatorial soft golden cloud deck
+      grad.addColorStop(0.8, '#fef08a');
+      grad.addColorStop(1, '#fef9c3');
       x.fillStyle = grad; x.fillRect(0, 0, 1024, 512);
-      x.fillStyle = 'rgba(254, 240, 138, 0.35)';
-      for (let i = 0; i < 50; i++) {
-        const py = r() * 512;
+
+      // Subtle zonal cloud bands
+      for (let y = 0; y < 512; y += 4) {
+        const bandAlpha = 0.08 + Math.sin(y * 0.04) * 0.06;
+        x.fillStyle = `rgba(217, 119, 6, ${bandAlpha})`;
+        x.fillRect(0, y, 1024, 3);
+      }
+
+      // Swirling planetary chevron cloud features
+      for (let i = 0; i < 75; i++) {
+        const py = 60 + r() * 392;
+        const px = r() * 1024;
+        const rw = 120 + r() * 220;
+        const rh = 20 + r() * 45;
+        x.fillStyle = r() > 0.4 ? 'rgba(254, 240, 138, 0.45)' : 'rgba(245, 158, 11, 0.22)';
         x.beginPath();
-        x.ellipse(r() * 1024, py, 120 + r() * 200, 15 + r() * 35, 0.08, 0, Math.PI * 2);
+        x.ellipse(px, py, rw, rh, 0.05, 0, Math.PI * 2);
         x.fill();
+      }
+
+      // Fine turbulent cloud streamers & swirls
+      x.lineWidth = 2.5;
+      for (let i = 0; i < 45; i++) {
+        x.strokeStyle = r() > 0.5 ? 'rgba(255, 255, 255, 0.45)' : 'rgba(202, 138, 4, 0.2)';
+        x.beginPath();
+        let cx = r() * 1024, cy = 40 + r() * 432;
+        x.moveTo(cx, cy);
+        for (let seg = 0; seg < 4; seg++) {
+          cx += (r() - 0.5) * 140; cy += (r() - 0.5) * 35;
+          x.lineTo(cx, cy);
+        }
+        x.stroke();
       }
     } else if (name === 'mars') {
       // Mars: Vibrant Rust-Red Crust, Dark Syrtis Major Volcanoes, Valles Marineris Canyon, & Polar Ice Caps
@@ -815,12 +842,16 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       b.mesh.scale.setScalar(b.radius);
       scene.add(b.mesh);
     } else {
-      // Photorealistic 3D textured planet globe with lighting, day/night shading, and axial tilt
+      // Photorealistic 3D solid textured planet globe with lighting, day/night shading, and axial tilt
+      const isVenus = (b.name || '').toLowerCase() === 'venus';
       b.material = new T.MeshStandardMaterial({
         map: b.textureMap,
-        roughness: b.type === 'gas' ? 0.85 : 0.68,
-        metalness: b.type === 'gas' ? 0.0 : 0.06,
-        color: b.textureMap ? 0xffffff : new T.Color(b.color || '#4f9cff')
+        roughness: b.type === 'gas' ? 0.82 : (isVenus ? 0.58 : 0.65),
+        metalness: 0.02,
+        emissiveMap: b.textureMap,
+        emissive: new T.Color(0xffffff),
+        emissiveIntensity: isVenus ? 0.42 : 0.28, // Guarantees solid, fully filled 3D globe with visible clouds & continents from every angle
+        color: 0xffffff
       });
       b.mesh = new T.Mesh(sphereGeo, b.material);
       b.mesh.userData.body = b;
@@ -829,59 +860,8 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       scene.add(b.mesh);
     }
 
-    // Atmospheric Scattering Rim Mesh
-    b.atmosphere = new T.Mesh(sphereGeo, new T.ShaderMaterial({
-      transparent: true,
-      side: T.FrontSide,
-      blending: T.AdditiveBlending,
-      depthWrite: false,
-      uniforms: {
-        tint: { value: new T.Color(b.atmoColor) },
-        strength: { value: Math.min(1.2, b.atmo * 0.35) }
-      },
-      vertexShader: `
-        varying vec3 vNormal;
-        varying vec3 vViewPosition;
-        void main() {
-          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-          vNormal = normalize(normalMatrix * normal);
-          vViewPosition = -mvPosition.xyz;
-          gl_Position = projectionMatrix * mvPosition;
-        }
-      `,
-      fragmentShader: `
-        uniform vec3 tint;
-        uniform float strength;
-        varying vec3 vNormal;
-        varying vec3 vViewPosition;
-        void main() {
-          vec3 n = normalize(vNormal);
-          vec3 v = normalize(vViewPosition);
-          float rim = 1.0 - max(0.0, dot(n, v));
-          float glow = pow(rim, 3.2);
-          gl_FragColor = vec4(tint, glow * strength);
-        }
-      `
-    }));
-    b.atmosphere.scale.setScalar(b.radius * 1.035);
-    b.atmosphere.visible = (b.atmo > 0.05) && !isStar && !isHole;
-    scene.add(b.atmosphere);
-
-    // Magnetosphere Loops (Planets only, NOT Stars or Black Holes!)
-    b.field = new T.Group();
-    if (!isStar && !isHole) {
-      for (let q = 0; q < 3; q++) {
-        const loop = new T.Mesh(
-          new T.TorusGeometry(1.3 + q * 0.25, 0.008, 8, 72),
-          new T.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.2 - q * 0.04, blending: T.AdditiveBlending, depthWrite: false })
-        );
-        loop.rotation.set(Math.PI / 2, q * 0.42, q * 0.63);
-        b.field.add(loop);
-      }
-      b.field.scale.setScalar(b.radius * 1.2);
-      b.field.visible = b.magnetic > 0;
-      scene.add(b.field);
-    }
+    b.atmosphere = null;
+    b.field = null;
 
     // Stellar Glow or Black Hole Rings (scaled down so Mercury at 0.39 AU is distinctly visible)
     if (isStar) {
@@ -1363,7 +1343,7 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
 
       const planetsData = [
         { name: 'Mercury', dist: 0.39, mass: 0.055, radius: 0.22, color: '#9e9389', type: 'rock', atmo: 0, temp: 440, inc: 0.0 },
-        { name: 'Venus', dist: 0.72, mass: 0.815, radius: 0.34, color: '#f59e0b', type: 'rock', atmo: 92, atmoColor: '#fcd34d', gasType: 'carbonDioxide', temp: 737, inc: 0.03 },
+        { name: 'Venus', dist: 0.72, mass: 0.815, radius: 0.34, color: '#fef08a', type: 'rock', atmo: 92, atmoColor: '#fef08a', gasType: 'carbonDioxide', temp: 737, inc: 0.02 },
         { name: 'Earth', dist: 1.00, mass: 1.000, radius: 0.36, color: '#4f9cff', type: 'rock', atmo: 1.0, atmoColor: '#76bfff', gasType: 'earthAir', water: 71, ice: 15, temp: 288, inc: 0.0 },
         { name: 'Mars', dist: 1.52, mass: 0.107, radius: 0.26, color: '#c2410c', type: 'rock', atmo: 0.01, atmoColor: '#f87171', water: 2, ice: 20, temp: 210, inc: 0.02 },
         { name: 'Jupiter', dist: 5.20, mass: 317.8, radius: 0.94, color: '#c8b399', type: 'gas', atmo: 3.0, bandCount: 14, bandColors: ['#e2cbb0', '#c89d6d', '#d7ad7d', '#9c7b58', '#f1d6b8'], temp: 165, inc: 0.01 },

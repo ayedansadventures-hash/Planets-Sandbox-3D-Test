@@ -51,7 +51,7 @@ canvas#universe { display: block; width: 100vw; height: 100vh; touch-action: non
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
   user-select: none;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, opacity 0.2s ease;
 }
 .planet-label:hover {
   background: rgba(2, 132, 199, 0.85);

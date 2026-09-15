@@ -32,12 +32,17 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
   controls.target.set(0, 0, 0);
 
   // Lighting & Realism
-  const ambientLight = new T.AmbientLight(0x708099, 1.25);
+  const ambientLight = new T.AmbientLight(0x8ba2c4, 1.4);
   scene.add(ambientLight);
-  const hemiLight = new T.HemisphereLight(0xffffff, 0x1e293b, 0.95);
+  const hemiLight = new T.HemisphereLight(0xffffff, 0x1e293b, 1.0);
   scene.add(hemiLight);
-  const sunlight = new T.PointLight(0xfff7e6, 80, 0, 0.2);
+  const sunlight = new T.PointLight(0xfff7e6, 85, 0, 0.2);
   scene.add(sunlight);
+
+  // Camera Fill Light (ensures night side of planets is softly visible and never black silhouettes)
+  const cameraFillLight = new T.DirectionalLight(0xdbeafe, 0.65);
+  camera.add(cameraFillLight);
+  scene.add(camera);
 
   // 360° Seamless Equirectangular Solar Photosphere Generator
   // Eliminates flat telescope photo golf-ball artifact with seamless spherical plasma noise
@@ -144,12 +149,17 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
   starGeo.setAttribute('color', new T.Float32BufferAttribute(starColors, 3));
   scene.add(new T.Points(starGeo, new T.PointsMaterial({ size: 1.15, vertexColors: true, transparent: true, opacity: 0.85, sizeAttenuation: true })));
 
-  // Rings & Geometry
+  // Sphere Geometry & Target Reticle
   const sphereGeo = new T.SphereGeometry(1, 64, 40);
-  const selectionRing = new T.Mesh(new T.RingGeometry(1.04, 1.14, 96), new T.MeshBasicMaterial({ color: 0x38bdf8, side: T.DoubleSide, transparent: true, opacity: 0.85, depthWrite: false }));
-  selectionRing.rotation.x = -Math.PI / 2;
-  selectionRing.visible = false;
-  scene.add(selectionRing);
+  const selectionReticle = new T.Group();
+  const reticleRing = new T.Mesh(
+    new T.RingGeometry(1.22, 1.28, 72),
+    new T.MeshBasicMaterial({ color: 0x38bdf8, side: T.DoubleSide, transparent: true, opacity: 0.65, depthWrite: false })
+  );
+  reticleRing.rotation.x = -Math.PI / 2;
+  selectionReticle.add(reticleRing);
+  selectionReticle.visible = false;
+  scene.add(selectionReticle);
 
   const placementRing = new T.Mesh(new T.RingGeometry(1.15, 1.25, 96), new T.MeshBasicMaterial({ color: 0x34d399, side: T.DoubleSide, transparent: true, opacity: 0.9, blending: T.AdditiveBlending, depthWrite: false }));
   placementRing.rotation.x = -Math.PI / 2; placementRing.visible = false; scene.add(placementRing);
@@ -287,38 +297,284 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
         x.fillStyle = r() > 0.4 ? '#fef08a' : '#f97316';
         x.beginPath(); x.arc(r() * 1024, r() * 512, r() * 16 + 3, 0, Math.PI * 2); x.fill();
       }
-    } else if (name === 'mercury' || (spec.type === 'rock' && (spec.water || 0) === 0 && (spec.atmo || 0) === 0 && spec.color === '#9e9389')) {
-      // Mercury: Cratered Highlands & Dark Basaltic Impact Basins
-      x.fillStyle = '#6b7280'; x.fillRect(0, 0, 1024, 512);
-      for (let i = 0; i < 25; i++) {
-        x.fillStyle = '#4b5563';
+    } else if (name === 'phobos') {
+      // Mars Moon Phobos: Dark Carbonaceous Asteroid with Grooves & Giant Stickney Crater
+      x.fillStyle = '#3a3532'; x.fillRect(0, 0, 1024, 512);
+      // Surface grain & mottled asteroid regolith
+      for (let i = 0; i < 40; i++) {
+        x.fillStyle = r() > 0.5 ? '#292523' : '#4a4440';
         x.beginPath();
-        x.ellipse(r() * 1024, r() * 512, 40 + r() * 100, 30 + r() * 70, r() * Math.PI, 0, Math.PI * 2);
+        x.ellipse(r() * 1024, r() * 512, 50 + r() * 80, 30 + r() * 50, r() * Math.PI, 0, Math.PI * 2);
         x.fill();
       }
-      for (let i = 0; i < 160; i++) {
-        const cx = r() * 1024, cy = r() * 512, rad = 3 + r() * 24;
-        x.fillStyle = '#374151';
-        x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.fill();
-        x.strokeStyle = '#9ca3af'; x.lineWidth = 1.5;
-        x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.stroke();
+      // Characteristic parallel linear fracture grooves / striations
+      x.strokeStyle = 'rgba(25, 23, 22, 0.75)';
+      x.lineWidth = 3;
+      for (let i = 0; i < 16; i++) {
+        const startY = 60 + i * 26 + (r() - 0.5) * 15;
+        x.beginPath();
+        x.moveTo(0, startY);
+        x.bezierCurveTo(340, startY + 25, 680, startY - 20, 1024, startY + 15);
+        x.stroke();
       }
-    } else if (name === 'moon' || (spec.isMoon && (spec.water || 0) <= 5 && (spec.atmo || 0) === 0)) {
-      // Moon: Lunar Maria Seas & Bright Impact Highlands
-      x.fillStyle = '#9ca3af'; x.fillRect(0, 0, 1024, 512);
-      const mariaColors = ['#4b5563', '#374151', '#475569'];
+      // Craters
+      for (let i = 0; i < 110; i++) {
+        const cx = r() * 1024, cy = r() * 512, rad = 3 + r() * 18;
+        x.fillStyle = '#1e1b19'; x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.fill();
+        x.strokeStyle = '#57514c'; x.lineWidth = 1.2; x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.stroke();
+      }
+      // Giant Stickney Impact Crater (takes up nearly half the hemisphere)
+      const stX = 380, stY = 250, stR = 95;
+      x.fillStyle = '#181614'; x.beginPath(); x.arc(stX, stY, stR, 0, Math.PI * 2); x.fill();
+      x.strokeStyle = '#d6d3d1'; x.lineWidth = 4; x.beginPath(); x.arc(stX, stY, stR, 0, Math.PI * 2); x.stroke();
+      // Bright Stickney ejecta rays
+      x.strokeStyle = 'rgba(214, 211, 209, 0.4)';
+      x.lineWidth = 2;
+      for (let a = 0; a < Math.PI * 2; a += 0.3) {
+        x.beginPath();
+        x.moveTo(stX + Math.cos(a) * stR, stY + Math.sin(a) * stR);
+        x.lineTo(stX + Math.cos(a) * (stR + 60 + r() * 80), stY + Math.sin(a) * (stR + 60 + r() * 80));
+        x.stroke();
+      }
+    } else if (name === 'deimos') {
+      // Mars Moon Deimos: Smoother, Dusty Reddish-Grey Regolith with Filled Talus Depressions
+      x.fillStyle = '#524b46'; x.fillRect(0, 0, 1024, 512);
+      // Soft dusty regolith blanket
       for (let i = 0; i < 35; i++) {
+        x.fillStyle = r() > 0.5 ? '#615953' : '#453e39';
+        x.beginPath();
+        x.ellipse(r() * 1024, r() * 512, 80 + r() * 120, 50 + r() * 70, r() * Math.PI, 0, Math.PI * 2);
+        x.fill();
+      }
+      // Soft bright dust deposits and smoothed talus slopes
+      for (let i = 0; i < 20; i++) {
+        x.fillStyle = 'rgba(168, 162, 158, 0.35)';
+        x.beginPath();
+        x.ellipse(r() * 1024, r() * 512, 40 + r() * 70, 20 + r() * 40, r() * Math.PI, 0, Math.PI * 2);
+        x.fill();
+      }
+      // Subdued, filled impact craters
+      for (let i = 0; i < 70; i++) {
+        const cx = r() * 1024, cy = r() * 512, rad = 3 + r() * 14;
+        x.fillStyle = '#3a3430'; x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.fill();
+        x.strokeStyle = '#78716c'; x.lineWidth = 1.0; x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.stroke();
+      }
+    } else if (name === 'io') {
+      // Jupiter Moon Io: Volcanic Sulfur Inferno (Yellow, Orange, Caldoras, NO craters)
+      const grad = x.createLinearGradient(0, 0, 0, 512);
+      grad.addColorStop(0, '#fef08a');
+      grad.addColorStop(0.35, '#eab308');
+      grad.addColorStop(0.7, '#ca8a04');
+      grad.addColorStop(1, '#fef08a');
+      x.fillStyle = grad; x.fillRect(0, 0, 1024, 512);
+      // Sulfur & silicate lava flow fields
+      for (let i = 0; i < 50; i++) {
+        x.fillStyle = r() > 0.5 ? '#f97316' : '#84cc16';
+        x.beginPath();
+        x.ellipse(r() * 1024, r() * 512, 50 + r() * 100, 25 + r() * 50, r() * Math.PI, 0, Math.PI * 2);
+        x.fill();
+      }
+      // Volcanic Calderas / Paterae (Loki Patera, Pele, Prometheus)
+      for (let i = 0; i < 45; i++) {
+        const cx = r() * 1024, cy = r() * 512, rad = 6 + r() * 22;
+        // White sulfur dioxide frost halo
+        x.strokeStyle = '#ffffff'; x.lineWidth = 3;
+        x.beginPath(); x.arc(cx, cy, rad + 8, 0, Math.PI * 2); x.stroke();
+        // Red sulfur ring
+        x.fillStyle = '#dc2626'; x.beginPath(); x.arc(cx, cy, rad + 4, 0, Math.PI * 2); x.fill();
+        // Pitch black volcanic magma caldera floor
+        x.fillStyle = '#18181b'; x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.fill();
+      }
+    } else if (name === 'europa') {
+      // Jupiter Moon Europa: Smooth Ice Shell with Dense Reddish Linear Fractures (Lineae)
+      x.fillStyle = '#f8fafc'; x.fillRect(0, 0, 1024, 512);
+      // Subtle icy mottling
+      for (let i = 0; i < 30; i++) {
+        x.fillStyle = 'rgba(226, 232, 240, 0.7)';
+        x.beginPath();
+        x.ellipse(r() * 1024, r() * 512, 60 + r() * 120, 30 + r() * 70, r() * Math.PI, 0, Math.PI * 2);
+        x.fill();
+      }
+      // Chaotic raft terrain
+      for (let i = 0; i < 20; i++) {
+        x.fillStyle = 'rgba(161, 98, 7, 0.28)';
+        x.beginPath();
+        x.ellipse(r() * 1024, r() * 512, 40 + r() * 80, 20 + r() * 45, r() * Math.PI, 0, Math.PI * 2);
+        x.fill();
+      }
+      // Intersecting Reddish-Brown Linear Fractures (Lineae & Double Ridges)
+      x.lineWidth = 2.5;
+      for (let i = 0; i < 55; i++) {
+        x.strokeStyle = r() > 0.4 ? '#991b1b' : '#7c2d12';
+        x.beginPath();
+        let px = r() * 1024, py = r() * 512;
+        x.moveTo(px, py);
+        for (let seg = 0; seg < 5; seg++) {
+          px += (r() - 0.5) * 220; py += (r() - 0.5) * 160;
+          x.lineTo(px, py);
+        }
+        x.stroke();
+      }
+    } else if (name === 'ganymede') {
+      // Jupiter Moon Ganymede: Dual Terrain - Ancient Dark Polygon Plates & Bright Grooved Terrain
+      x.fillStyle = '#334155'; x.fillRect(0, 0, 1024, 512);
+      // Bright grooved terrain bands (sulci)
+      x.fillStyle = '#94a3b8';
+      for (let i = 0; i < 28; i++) {
+        x.beginPath();
+        x.ellipse(r() * 1024, r() * 512, 80 + r() * 160, 20 + r() * 40, r() * Math.PI, 0, Math.PI * 2);
+        x.fill();
+      }
+      // Grooved striations inside bright terrain
+      x.strokeStyle = 'rgba(241, 245, 249, 0.45)';
+      x.lineWidth = 1.5;
+      for (let i = 0; i < 40; i++) {
+        const y = r() * 512;
+        x.beginPath(); x.moveTo(0, y); x.lineTo(1024, y + (r() - 0.5) * 40); x.stroke();
+      }
+      // Craters with bright icy rays
+      for (let i = 0; i < 90; i++) {
+        const cx = r() * 1024, cy = r() * 512, rad = 3 + r() * 16;
+        x.fillStyle = '#1e293b'; x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.fill();
+        x.strokeStyle = '#f8fafc'; x.lineWidth = 1.2; x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.stroke();
+      }
+    } else if (name === 'callisto') {
+      // Jupiter Moon Callisto: Dark Saturated Silicate Ice with Millions of Frosty Impact Scars
+      x.fillStyle = '#1e293b'; x.fillRect(0, 0, 1024, 512);
+      // Dark silicate patches
+      for (let i = 0; i < 35; i++) {
+        x.fillStyle = '#0f172a';
+        x.beginPath();
+        x.ellipse(r() * 1024, r() * 512, 60 + r() * 100, 30 + r() * 60, r() * Math.PI, 0, Math.PI * 2);
+        x.fill();
+      }
+      // Giant Valhalla Multi-Ring Impact Basin (concentric frosty ripples)
+      const vX = 600, vY = 240;
+      for (let ring = 1; ring <= 8; ring++) {
+        x.strokeStyle = `rgba(241, 245, 249, ${0.45 - ring * 0.04})`;
+        x.lineWidth = 2.5;
+        x.beginPath(); x.arc(vX, vY, ring * 22, 0, Math.PI * 2); x.stroke();
+      }
+      // Heavily saturated white icy impact craters
+      for (let i = 0; i < 260; i++) {
+        const cx = r() * 1024, cy = r() * 512, rad = 2 + r() * 14;
+        x.fillStyle = '#f8fafc'; x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.fill();
+        x.strokeStyle = '#94a3b8'; x.lineWidth = 1; x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.stroke();
+      }
+    } else if (name === 'titan') {
+      // Saturn Moon Titan: Golden-Amber Photochemical Smog with Dark Equatorial Dune Fields
+      const grad = x.createLinearGradient(0, 0, 0, 512);
+      grad.addColorStop(0, '#d97706');
+      grad.addColorStop(0.2, '#f59e0b');
+      grad.addColorStop(0.5, '#fbbf24');
+      grad.addColorStop(0.8, '#f59e0b');
+      grad.addColorStop(1, '#b45309');
+      x.fillStyle = grad; x.fillRect(0, 0, 1024, 512);
+      // Dark equatorial hydrocarbon dunes (Shangri-La)
+      x.fillStyle = 'rgba(69, 26, 3, 0.55)';
+      for (let i = 0; i < 20; i++) {
+        x.beginPath();
+        x.ellipse(r() * 1024, 256 + (r() - 0.5) * 90, 80 + r() * 150, 15 + r() * 25, 0, 0, Math.PI * 2);
+        x.fill();
+      }
+      // Polar methane lake clusters (Kraken Mare)
+      x.fillStyle = '#0f172a';
+      for (let i = 0; i < 8; i++) {
+        x.beginPath();
+        x.ellipse(300 + r() * 400, 35 + r() * 40, 25 + r() * 45, 12 + r() * 20, 0, 0, Math.PI * 2);
+        x.fill();
+      }
+    } else if (name === 'titania') {
+      // Uranus Moon Titania: Silvery Ice-Rock Crust Slashed by Giant Fault Canyons
+      x.fillStyle = '#94a3b8'; x.fillRect(0, 0, 1024, 512);
+      // Ancient darker terrain
+      for (let i = 0; i < 30; i++) {
+        x.fillStyle = '#64748b';
+        x.beginPath();
+        x.ellipse(r() * 1024, r() * 512, 60 + r() * 100, 30 + r() * 50, r() * Math.PI, 0, Math.PI * 2);
+        x.fill();
+      }
+      // Giant fault canyon grabens (Messina Chasma)
+      x.strokeStyle = '#334155'; x.lineWidth = 5;
+      x.beginPath(); x.moveTo(120, 180); x.bezierCurveTo(400, 240, 700, 280, 950, 360); x.stroke();
+      x.strokeStyle = '#f8fafc'; x.lineWidth = 1.5;
+      x.beginPath(); x.moveTo(120, 178); x.bezierCurveTo(400, 238, 700, 278, 950, 358); x.stroke();
+      // Bright impact craters
+      for (let i = 0; i < 90; i++) {
+        const cx = r() * 1024, cy = r() * 512, rad = 3 + r() * 15;
+        x.fillStyle = '#f8fafc'; x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.fill();
+      }
+    } else if (name === 'triton') {
+      // Neptune Moon Triton: Pinkish Nitrogen Frost, Cantaloupe Dimpled Terrain & Geyser Plumes
+      x.fillStyle = '#99f6e4'; x.fillRect(0, 0, 1024, 512);
+      // Southern pink nitrogen ice cap
+      const pinkGrad = x.createLinearGradient(0, 300, 0, 512);
+      pinkGrad.addColorStop(0, 'rgba(244, 114, 182, 0.0)');
+      pinkGrad.addColorStop(0.3, 'rgba(244, 114, 182, 0.7)');
+      pinkGrad.addColorStop(1, '#f472b6');
+      x.fillStyle = pinkGrad; x.fillRect(0, 300, 1024, 212);
+      // Dimpled cantaloupe terrain (crisscrossing circular depressions)
+      x.strokeStyle = 'rgba(15, 118, 110, 0.45)'; x.lineWidth = 2;
+      for (let i = 0; i < 90; i++) {
+        x.beginPath();
+        x.arc(r() * 1024, 50 + r() * 260, 12 + r() * 18, 0, Math.PI * 2);
+        x.stroke();
+      }
+      // Cryovolcanic geyser vent streaks (dark nitrogen plumes blown by thin winds)
+      x.fillStyle = '#0f172a';
+      for (let i = 0; i < 15; i++) {
+        const gx = 200 + r() * 600, gy = 350 + r() * 120;
+        x.beginPath(); x.arc(gx, gy, 3, 0, Math.PI * 2); x.fill();
+        x.strokeStyle = 'rgba(15, 23, 42, 0.6)'; x.lineWidth = 2;
+        x.beginPath(); x.moveTo(gx, gy); x.lineTo(gx + 30 + r() * 35, gy - 15 - r() * 20); x.stroke();
+      }
+    } else if (name === 'moon') {
+      // Earth's Moon: Silvery-Grey Highlands & Dark Basaltic Maria Seas with Tycho Crater Rays
+      x.fillStyle = '#9ca3af'; x.fillRect(0, 0, 1024, 512);
+      // Major lunar maria (Sea of Tranquility, Ocean of Storms)
+      const mariaColors = ['#475569', '#334155', '#1e293b'];
+      for (let i = 0; i < 30; i++) {
         x.fillStyle = mariaColors[Math.floor(r() * mariaColors.length)];
         x.beginPath();
-        x.ellipse(r() * 1024, r() * 512, 50 + r() * 130, 35 + r() * 90, r() * Math.PI, 0, Math.PI * 2);
+        x.ellipse(r() * 1024, r() * 512, 60 + r() * 140, 40 + r() * 95, r() * Math.PI, 0, Math.PI * 2);
         x.fill();
       }
-      for (let i = 0; i < 200; i++) {
-        const cx = r() * 1024, cy = r() * 512, rad = 2 + r() * 20;
-        x.fillStyle = '#1f2937';
-        x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.fill();
-        x.strokeStyle = '#d1d5db'; x.lineWidth = 1.2;
-        x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.stroke();
+      // Impact craters
+      for (let i = 0; i < 160; i++) {
+        const cx = r() * 1024, cy = r() * 512, rad = 3 + r() * 20;
+        x.fillStyle = '#1e293b'; x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.fill();
+        x.strokeStyle = '#d1d5db'; x.lineWidth = 1.3; x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.stroke();
+      }
+      // Tycho Rayed Crater
+      const tX = 520, tY = 380, tR = 14;
+      x.fillStyle = '#f8fafc'; x.beginPath(); x.arc(tX, tY, tR, 0, Math.PI * 2); x.fill();
+      x.strokeStyle = 'rgba(248, 250, 252, 0.55)'; x.lineWidth = 1.5;
+      for (let a = 0; a < Math.PI * 2; a += 0.25) {
+        x.beginPath();
+        x.moveTo(tX, tY);
+        x.lineTo(tX + Math.cos(a) * (140 + r() * 160), tY + Math.sin(a) * (140 + r() * 160));
+        x.stroke();
+      }
+    } else if (name === 'mercury' || (spec.type === 'rock' && (spec.water || 0) === 0 && (spec.atmo || 0) === 0 && spec.color === '#9e9389')) {
+      // Mercury: Cratered Highlands, Caloris Basin & Silvery Impact Basins
+      x.fillStyle = '#6b7280'; x.fillRect(0, 0, 1024, 512);
+      for (let i = 0; i < 28; i++) {
+        x.fillStyle = '#4b5563';
+        x.beginPath();
+        x.ellipse(r() * 1024, r() * 512, 45 + r() * 110, 30 + r() * 75, r() * Math.PI, 0, Math.PI * 2);
+        x.fill();
+      }
+      // Caloris Basin
+      const cbX = 350, cbY = 250;
+      for (let ring = 1; ring <= 5; ring++) {
+        x.strokeStyle = `rgba(156, 163, 175, ${0.5 - ring * 0.08})`;
+        x.lineWidth = 2.5;
+        x.beginPath(); x.arc(cbX, cbY, ring * 24, 0, Math.PI * 2); x.stroke();
+      }
+      for (let i = 0; i < 180; i++) {
+        const cx = r() * 1024, cy = r() * 512, rad = 3 + r() * 22;
+        x.fillStyle = '#374151'; x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.fill();
+        x.strokeStyle = '#d1d5db'; x.lineWidth = 1.2; x.beginPath(); x.arc(cx, cy, rad, 0, Math.PI * 2); x.stroke();
       }
     } else if (name === 'venus') {
       // Venus: Dense Swirling Golden Sulfuric Clouds
@@ -336,21 +592,45 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
         x.fill();
       }
     } else if (name === 'mars') {
-      // Mars: Rusty Red Crust with Syrtis Major Volcano Basins & Polar Caps
+      // Mars: Vibrant Rust-Red Crust, Dark Syrtis Major Volcanoes, Valles Marineris Canyon, & Polar Ice Caps
       x.fillStyle = '#c2410c'; x.fillRect(0, 0, 1024, 512);
-      const darkPlains = ['#7c2d12', '#451a03', '#9a3412'];
-      for (let i = 0; i < 40; i++) {
-        x.fillStyle = darkPlains[Math.floor(r() * darkPlains.length)];
+      // Dunes & color variation
+      for (let i = 0; i < 35; i++) {
+        x.fillStyle = '#ea580c';
         x.beginPath();
-        x.ellipse(r() * 1024, 100 + r() * 312, 60 + r() * 140, 30 + r() * 70, r() * Math.PI, 0, Math.PI * 2);
+        x.ellipse(r() * 1024, r() * 512, 100 + r() * 160, 40 + r() * 80, 0, 0, Math.PI * 2);
         x.fill();
       }
-      x.strokeStyle = '#3b1207'; x.lineWidth = 5;
+      // Dark Volcanic Basalt Highlands (Syrtis Major, Acidalia Planitia, Tharsis)
+      const darkPlains = ['#7c2d12', '#451a03', '#3b1207'];
+      for (let i = 0; i < 35; i++) {
+        x.fillStyle = darkPlains[Math.floor(r() * darkPlains.length)];
+        x.beginPath();
+        x.ellipse(r() * 1024, 100 + r() * 312, 70 + r() * 140, 35 + r() * 70, r() * Math.PI, 0, Math.PI * 2);
+        x.fill();
+      }
+      // Giant Valles Marineris Canyon Rift (slashing 400px across the equator)
+      x.strokeStyle = '#260701'; x.lineWidth = 7;
       x.beginPath();
-      x.moveTo(350, 260); x.lineTo(580, 275); x.stroke();
-      x.fillStyle = '#f8fafc';
-      x.beginPath(); x.ellipse(512, 18, 160, 22, 0, 0, Math.PI * 2); x.fill();
-      x.beginPath(); x.ellipse(512, 494, 140, 20, 0, 0, Math.PI * 2); x.fill();
+      x.moveTo(320, 260);
+      x.bezierCurveTo(450, 275, 580, 255, 720, 270);
+      x.stroke();
+      x.lineWidth = 3;
+      x.beginPath();
+      x.moveTo(420, 270); x.lineTo(460, 305);
+      x.moveTo(540, 260); x.lineTo(590, 235);
+      x.stroke();
+      // Olympus Mons Caldera
+      x.fillStyle = '#451a03'; x.beginPath(); x.arc(260, 210, 38, 0, Math.PI * 2); x.fill();
+      x.fillStyle = '#260701'; x.beginPath(); x.arc(260, 210, 14, 0, Math.PI * 2); x.fill();
+      // Gleaming North & South Polar Ice Caps
+      x.fillStyle = '#ffffff';
+      x.beginPath(); x.ellipse(512, 22, 180, 26, 0, 0, Math.PI * 2); x.fill();
+      x.beginPath(); x.ellipse(512, 490, 160, 24, 0, 0, Math.PI * 2); x.fill();
+      // Polar frost fringe
+      x.fillStyle = 'rgba(224, 242, 254, 0.55)';
+      x.beginPath(); x.ellipse(512, 32, 220, 32, 0, 0, Math.PI * 2); x.fill();
+      x.beginPath(); x.ellipse(512, 480, 200, 30, 0, 0, Math.PI * 2); x.fill();
     } else if (isGas || name === 'jupiter' || name === 'saturn' || name === 'uranus' || name === 'neptune') {
       // Banded Gas Giants
       let palette;
@@ -413,8 +693,16 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
           x.ellipse(px, py, rw, rh, r() * Math.PI, 0, Math.PI * 2);
           x.fill();
         }
+        // Deserts & Mountain Ridges
+        x.fillStyle = '#d97706';
+        for (let i = 0; i < numBlobs * 0.3; i++) {
+          const px = r() * 1024, py = 160 + r() * 190;
+          x.beginPath();
+          x.ellipse(px, py, 15 + r() * 45, 10 + r() * 25, 0, 0, Math.PI * 2);
+          x.fill();
+        }
         x.fillStyle = '#78350f';
-        for (let i = 0; i < numBlobs * 0.4; i++) {
+        for (let i = 0; i < numBlobs * 0.35; i++) {
           const px = r() * 1024, py = 70 + r() * 372;
           x.beginPath();
           x.ellipse(px, py, 10 + r() * 35, 6 + r() * 20, r() * Math.PI, 0, Math.PI * 2);
@@ -422,22 +710,27 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
         }
       }
 
+      // Swirling atmospheric weather clouds
       if ((spec.atmo || 0) > 0.05) {
-        x.fillStyle = 'rgba(255, 255, 255, 0.35)';
-        for (let i = 0; i < 45; i++) {
+        x.fillStyle = 'rgba(255, 255, 255, 0.55)';
+        for (let i = 0; i < 50; i++) {
           const cy = 40 + r() * 432;
           x.beginPath();
-          x.ellipse(r() * 1024, cy, 60 + r() * 180, 8 + r() * 22, 0.05, 0, Math.PI * 2);
+          x.ellipse(r() * 1024, cy, 70 + r() * 190, 8 + r() * 24, 0.06, 0, Math.PI * 2);
           x.fill();
         }
       }
 
+      // Polar Ice Caps
       const ice = spec.iceCapCoverage ?? spec.ice ?? 12;
       if (ice > 0) {
-        x.fillStyle = '#f8fafc';
-        const h = Math.max(8, ice * 1.3);
+        x.fillStyle = '#ffffff';
+        const h = Math.max(12, ice * 1.4);
         x.fillRect(0, 0, 1024, h);
         x.fillRect(0, 512 - h, 1024, h);
+        x.fillStyle = 'rgba(224, 242, 254, 0.6)';
+        x.fillRect(0, h, 1024, 10);
+        x.fillRect(0, 512 - h - 10, 1024, 10);
       }
     }
 
@@ -493,10 +786,8 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     const isStar = b.type === 'star';
     const isHole = b.isBlackHole;
 
-    if (spec.textureKey && nasaTextures[spec.textureKey]) {
-      b.textureMap = nasaTextures[spec.textureKey];
-    } else if (isStar) {
-      b.textureMap = nasaTextures.sun;
+    if (isStar) {
+      b.textureMap = generateSeamlessSunTexture();
     } else if (isHole) {
       b.textureMap = null;
     } else {
@@ -928,7 +1219,10 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     const ex = vxh_x - rx / r;
     const ey = vxh_y - ry / r;
     const ez = vxh_z - rz / r;
-    const rawE = Math.min(0.96, Math.hypot(ex, ey, ez) || 0);
+    let rawE = Math.min(0.96, Math.hypot(ex, ey, ez) || 0);
+    if (body.name === 'Mercury' || rawE < 0.035) {
+      rawE = Math.min(0.015, rawE);
+    }
 
     // Orbital normal vector
     const wx = hx / h, wy = hy / h, wz = hz / h;
@@ -936,7 +1230,9 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     // In-plane basis vectors
     let px, py, pz, qx, qy, qz;
     if (rawE > 1e-3) {
-      px = ex / rawE; py = ey / rawE; pz = ez / rawE;
+      px = ex / (Math.hypot(ex, ey, ez) || 1);
+      py = ey / (Math.hypot(ex, ey, ez) || 1);
+      pz = ez / (Math.hypot(ex, ey, ez) || 1);
       qx = wy * pz - wz * py;
       qy = wz * px - wx * pz;
       qz = wx * py - wy * px;
@@ -1066,14 +1362,14 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       const sun = createBody({ name: 'Sun', type: 'star', scienceType: 'star', mass: 1.0, radius: 1.6, color: '#fff0cb', textureKey: 'sun', temp: 5778, atmo: 0, magnetic: 0 });
 
       const planetsData = [
-        { name: 'Mercury', dist: 0.39, mass: 0.055, radius: 0.22, color: '#9e9389', type: 'rock', textureKey: 'mercury', atmo: 0, temp: 440, inc: 0.12 },
-        { name: 'Venus', dist: 0.72, mass: 0.815, radius: 0.34, color: '#d7c6a5', type: 'rock', textureKey: 'venus', atmo: 92, atmoColor: '#fcd34d', gasType: 'carbonDioxide', temp: 737, inc: 0.05 },
-        { name: 'Earth', dist: 1.00, mass: 1.000, radius: 0.36, color: '#4f9cff', type: 'rock', textureKey: 'earth', atmo: 1.0, atmoColor: '#76bfff', gasType: 'earthAir', water: 71, ice: 15, temp: 288, inc: 0.02 },
-        { name: 'Mars', dist: 1.52, mass: 0.107, radius: 0.26, color: '#b87453', type: 'rock', textureKey: 'mars', atmo: 0.01, atmoColor: '#f87171', water: 2, ice: 20, temp: 210, inc: 0.03 },
-        { name: 'Jupiter', dist: 5.20, mass: 317.8, radius: 0.94, color: '#c8b399', type: 'gas', textureKey: 'jupiter', atmo: 3.0, bandCount: 12, bandColors: ['#d7ad7d', '#c89d6d', '#e2cbb0', '#9c7b58'], temp: 165, inc: 0.02 },
-        { name: 'Saturn', dist: 9.58, mass: 95.2, radius: 0.80, color: '#d3c39b', type: 'gas', textureKey: 'saturn', atmo: 2.5, ring: true, ringScale: 2.4, ringColor: '#c7b997', temp: 134, inc: 0.04 },
-        { name: 'Uranus', dist: 19.20, mass: 14.5, radius: 0.60, color: '#98cbd0', type: 'gas', textureKey: 'uranus', atmo: 2.0, ring: true, ringScale: 1.9, ringColor: '#93c5fd', tilt: 98, temp: 76, inc: 0.01 },
-        { name: 'Neptune', dist: 30.05, mass: 17.1, radius: 0.58, color: '#739cc4', type: 'gas', textureKey: 'neptune', atmo: 2.0, ring: true, ringScale: 1.7, temp: 72, inc: 0.03 }
+        { name: 'Mercury', dist: 0.39, mass: 0.055, radius: 0.22, color: '#9e9389', type: 'rock', atmo: 0, temp: 440, inc: 0.0 },
+        { name: 'Venus', dist: 0.72, mass: 0.815, radius: 0.34, color: '#f59e0b', type: 'rock', atmo: 92, atmoColor: '#fcd34d', gasType: 'carbonDioxide', temp: 737, inc: 0.03 },
+        { name: 'Earth', dist: 1.00, mass: 1.000, radius: 0.36, color: '#4f9cff', type: 'rock', atmo: 1.0, atmoColor: '#76bfff', gasType: 'earthAir', water: 71, ice: 15, temp: 288, inc: 0.0 },
+        { name: 'Mars', dist: 1.52, mass: 0.107, radius: 0.26, color: '#c2410c', type: 'rock', atmo: 0.01, atmoColor: '#f87171', water: 2, ice: 20, temp: 210, inc: 0.02 },
+        { name: 'Jupiter', dist: 5.20, mass: 317.8, radius: 0.94, color: '#c8b399', type: 'gas', atmo: 3.0, bandCount: 14, bandColors: ['#e2cbb0', '#c89d6d', '#d7ad7d', '#9c7b58', '#f1d6b8'], temp: 165, inc: 0.01 },
+        { name: 'Saturn', dist: 9.58, mass: 95.2, radius: 0.80, color: '#d3c39b', type: 'gas', atmo: 2.5, ring: true, ringScale: 2.4, ringColor: '#c7b997', temp: 134, inc: 0.02 },
+        { name: 'Uranus', dist: 19.20, mass: 14.5, radius: 0.60, color: '#98cbd0', type: 'gas', atmo: 2.0, ring: true, ringScale: 1.9, ringColor: '#93c5fd', tilt: 98, temp: 76, inc: 0.01 },
+        { name: 'Neptune', dist: 30.05, mass: 17.1, radius: 0.58, color: '#2563eb', type: 'gas', atmo: 2.0, ring: true, ringScale: 1.7, temp: 72, inc: 0.02 }
       ];
 
       const pMap = {};
@@ -1084,7 +1380,6 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
           radius: pd.radius,
           color: pd.color,
           type: pd.type,
-          textureKey: pd.textureKey,
           atmo: pd.atmo,
           atmoColor: pd.atmoColor,
           gasType: pd.gasType,
@@ -1103,13 +1398,13 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
 
       // Moons with realistic visual clearance & local gravity coupling
       if (moonsEngaged) {
-        const addMoon = (parent, name, massE, rad, distAU, angle, inc = 0.04) => {
+        const addMoon = (parent, name, massE, rad, distAU, angle, inc = 0.02, color = '#c2c0b6') => {
           spawnOrbiter(parent, {
             name,
             type: 'moon',
             mass: massE / EARTHS_PER_SUN,
             radius: rad,
-            color: '#c2c0b6',
+            color,
             atmo: 0,
             water: 2,
             ice: 15,
@@ -1120,16 +1415,16 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
           }, distAU, angle, inc);
         };
 
-        addMoon(pMap['Earth'], 'Moon', 0.0123, 0.10, 0.085, 0.4);
-        addMoon(pMap['Mars'], 'Phobos', 1.8e-9, 0.05, 0.055, 1.2);
-        addMoon(pMap['Mars'], 'Deimos', 2.5e-10, 0.04, 0.078, 3.8);
-        addMoon(pMap['Jupiter'], 'Io', 0.015, 0.07, 0.15, 0.6);
-        addMoon(pMap['Jupiter'], 'Europa', 0.008, 0.065, 0.21, 1.7);
-        addMoon(pMap['Jupiter'], 'Ganymede', 0.025, 0.085, 0.29, 2.9);
-        addMoon(pMap['Jupiter'], 'Callisto', 0.018, 0.08, 0.38, 4.3);
-        addMoon(pMap['Saturn'], 'Titan', 0.0225, 0.085, 0.28, 1.4);
-        addMoon(pMap['Uranus'], 'Titania', 0.0006, 0.055, 0.18, 2.1);
-        addMoon(pMap['Neptune'], 'Triton', 0.0036, 0.065, 0.18, 4.2);
+        addMoon(pMap['Earth'], 'Moon', 0.0123, 0.10, 0.085, 0.4, 0.03, '#c2c0b6');
+        addMoon(pMap['Mars'], 'Phobos', 1.8e-9, 0.06, 0.055, 1.2, 0.01, '#4a4542');
+        addMoon(pMap['Mars'], 'Deimos', 2.5e-10, 0.05, 0.078, 3.8, 0.02, '#5c534b');
+        addMoon(pMap['Jupiter'], 'Io', 0.015, 0.08, 0.15, 0.6, 0.01, '#eab308');
+        addMoon(pMap['Jupiter'], 'Europa', 0.008, 0.075, 0.21, 1.7, 0.02, '#f8fafc');
+        addMoon(pMap['Jupiter'], 'Ganymede', 0.025, 0.09, 0.29, 2.9, 0.01, '#94a3b8');
+        addMoon(pMap['Jupiter'], 'Callisto', 0.018, 0.085, 0.38, 4.3, 0.01, '#475569');
+        addMoon(pMap['Saturn'], 'Titan', 0.0225, 0.09, 0.28, 1.4, 0.02, '#f59e0b');
+        addMoon(pMap['Uranus'], 'Titania', 0.0006, 0.065, 0.18, 2.1, 0.01, '#cbd5e1');
+        addMoon(pMap['Neptune'], 'Triton', 0.0036, 0.07, 0.18, 4.2, 0.02, '#99f6e4');
       }
 
       buildAsteroidBelt();
@@ -1427,15 +1722,15 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
 
     if (!b) {
       inspector.hidden = true;
-      selectionRing.visible = false;
+      selectionReticle.visible = false;
       return;
     }
 
     inspector.hidden = false;
-    selectionRing.visible = true;
-    selectionRing.position.copy(b.mesh.position);
-    selectionRing.scale.setScalar(b.radius * 1.3);
-    selectionRing.material.color.set(b.type === 'star' ? 0xf59e0b : 0x38bdf8);
+    selectionReticle.visible = true;
+    selectionReticle.position.copy(b.mesh.position);
+    selectionReticle.scale.setScalar(b.radius * 1.35);
+    reticleRing.material.color.set(b.type === 'star' ? 0xf59e0b : 0x38bdf8);
 
     $('title').textContent = b.name;
     $('classification').textContent = b.isBlackHole ? 'Black Hole' : b.type === 'star' ? 'Stellar Body' : b.type === 'gas' ? 'Gas Giant' : b.isMoon ? 'Natural Satellite' : 'Terrestrial Planet';
@@ -2187,15 +2482,17 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       }
     });
 
-    window.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('#commandBar') || e.target.closest('#inspector') || e.target.closest('#creator') || e.target.closest('footer') || e.target.closest('.planet-label')) return;
+    let pointerDownPos = { x: 0, y: 0 };
+    let isPointerDown = false;
 
-      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    function handleBodySelectionClick(clickX, clickY) {
+      mouse.x = (clickX / window.innerWidth) * 2 - 1;
+      mouse.y = -(clickY / window.innerHeight) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
 
       // 1. Direct 3D Mesh Raycasting
-      const intersects = raycaster.intersectObjects(bodies.map(b => b.mesh));
+      const meshes = bodies.map(b => b.mesh).filter(Boolean);
+      const intersects = raycaster.intersectObjects(meshes, false);
       if (intersects.length > 0) {
         const hitBody = intersects[0].object.userData.body;
         if (hitBody) {
@@ -2205,23 +2502,30 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
         }
       }
 
-      // 2. Screen-Space Proximity Snapping (makes selecting small, distant planets effortless)
+      // 2. High-Precision Screen-Space Proximity Snapping
       let bestBody = null;
-      let bestDist = 28; // 28px click tolerance
-      const clickX = e.clientX, clickY = e.clientY;
+      let bestScore = Infinity;
       const projV = new T.Vector3();
+      const fovRad = (camera.fov * Math.PI) / 180;
+      const projScale = window.innerHeight / (2 * Math.tan(fovRad / 2));
 
       for (const b of bodies) {
         projV.copy(b.mesh.position).project(camera);
         if (projV.z < 1.0) { // In front of camera
           const sx = (projV.x * 0.5 + 0.5) * window.innerWidth;
           const sy = (-(projV.y * 0.5) + 0.5) * window.innerHeight;
-          const dist = Math.hypot(clickX - sx, clickY - sy);
-          const screenRadius = Math.max(14, (b.radius * AU / Math.max(1, camera.position.distanceTo(b.mesh.position))) * 350);
-          const tolerance = Math.max(bestDist, screenRadius);
-          if (dist < tolerance && dist < bestDist) {
-            bestDist = dist;
-            bestBody = b;
+          const distPx = Math.hypot(clickX - sx, clickY - sy);
+
+          const camDist = Math.max(0.1, camera.position.distanceTo(b.mesh.position));
+          const screenRadPx = (b.radius / camDist) * projScale;
+          const hitThresholdPx = Math.max(32, screenRadPx * 1.4);
+
+          if (distPx <= hitThresholdPx) {
+            const score = distPx / hitThresholdPx;
+            if (score < bestScore) {
+              bestScore = score;
+              bestBody = b;
+            }
           }
         }
       }
@@ -2242,6 +2546,46 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
           hit.y = 0;
           spawnPlacedObject(hit);
         }
+      }
+    }
+
+    window.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('#commandBar') || e.target.closest('#inspector') || e.target.closest('#creator') || e.target.closest('footer') || e.target.closest('.planet-label')) return;
+      isPointerDown = true;
+      pointerDownPos.x = e.clientX;
+      pointerDownPos.y = e.clientY;
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      if (!isPointerDown) return;
+      // When following a planet, dragging the pointer outside its area releases camera tracking
+      if (following && selected) {
+        const projV = new T.Vector3().copy(selected.mesh.position).project(camera);
+        if (projV.z < 1.0) {
+          const sx = (projV.x * 0.5 + 0.5) * window.innerWidth;
+          const sy = (-(projV.y * 0.5) + 0.5) * window.innerHeight;
+          const distFromPlanetPx = Math.hypot(e.clientX - sx, e.clientY - sy);
+          const camDist = Math.max(0.1, camera.position.distanceTo(selected.mesh.position));
+          const fovRad = (camera.fov * Math.PI) / 180;
+          const projScale = window.innerHeight / (2 * Math.tan(fovRad / 2));
+          const screenRadPx = (selected.radius / camDist) * projScale;
+          const allowedAreaPx = Math.max(50, screenRadPx * 2.2);
+
+          if (distFromPlanetPx > allowedAreaPx) {
+            following = false;
+            showToast(`Camera unlocked from ${selected.name}`);
+          }
+        }
+      }
+    });
+
+    window.addEventListener('pointerup', (e) => {
+      isPointerDown = false;
+      if (e.target.closest('#commandBar') || e.target.closest('#inspector') || e.target.closest('#creator') || e.target.closest('footer') || e.target.closest('.planet-label')) return;
+
+      const moveDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+      if (moveDist <= 7) {
+        handleBodySelectionClick(e.clientX, e.clientY);
       }
     });
 
@@ -2372,6 +2716,20 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     const w = window.innerWidth;
     const h = window.innerHeight;
 
+    // 1. Calculate camera distance to each body to determine closest body and proximity
+    let nearestBody = null;
+    let minCamDist = Infinity;
+    const distMap = new Map();
+
+    for (const b of bodies) {
+      const d = camera.position.distanceTo(b.mesh.position);
+      distMap.set(b.id, d);
+      if (d < minCamDist) {
+        minCamDist = d;
+        nearestBody = b;
+      }
+    }
+
     for (const b of bodies) {
       let el = bodyLabelMap.get(b.id);
       if (!el) {
@@ -2391,8 +2749,18 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
       el.classList.toggle('selected-label', b === selected);
 
       tempV.copy(b.mesh.position).project(camera);
-      // In front of camera & within visible screen margin
-      if (tempV.z < 1.0 && tempV.x >= -1.1 && tempV.x <= 1.1 && tempV.y >= -1.1 && tempV.y <= 1.1) {
+      const inFront = tempV.z < 1.0 && tempV.x >= -1.1 && tempV.x <= 1.1 && tempV.y >= -1.1 && tempV.y <= 1.1;
+
+      // Proximity condition:
+      // Show label if:
+      // 1. Planet is selected
+      // 2. Planet is the nearest body to the camera
+      // 3. Camera is within proximity neighborhood of the planet
+      const dist = distMap.get(b.id) || Infinity;
+      const proximityThreshold = Math.max(20, b.radius * AU * 3.2);
+      const isClose = (b === selected) || (b === nearestBody) || (dist < proximityThreshold);
+
+      if (inFront && isClose) {
         const x = (tempV.x * 0.5 + 0.5) * w;
         const y = (-(tempV.y * 0.5) + 0.5) * h;
         el.style.left = `${Math.round(x)}px`;
@@ -2534,13 +2902,12 @@ import { G, EARTHS_PER_SUN, KM_PER_AU, AU_YEAR_TO_KM_S, step, computeAcceleratio
     }
 
     if (selected) {
-      selectionRing.position.copy(selected.mesh.position);
-      selectionRing.quaternion.copy(camera.quaternion);
-      selectionRing.scale.setScalar(selected.radius * 1.35);
-      selectionRing.material.color.set(selected.type === 'star' ? 0xf59e0b : 0x38bdf8);
-      selectionRing.visible = true;
+      selectionReticle.position.copy(selected.mesh.position);
+      selectionReticle.scale.setScalar(selected.radius * 1.35);
+      reticleRing.material.color.set(selected.type === 'star' ? 0xf59e0b : 0x38bdf8);
+      selectionReticle.visible = true;
     } else {
-      selectionRing.visible = false;
+      selectionReticle.visible = false;
     }
 
     updateOrbitLines();
